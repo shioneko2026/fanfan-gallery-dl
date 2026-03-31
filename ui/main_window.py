@@ -133,27 +133,8 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        self.toggle_log_btn = QPushButton("◀")
-        self.toggle_log_btn.setFixedSize(30, 30)
-        self.toggle_log_btn.setToolTip("Hide Log Panel")
-        self.toggle_log_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1976d2;
-                color: white;
-                border: none;
-                border-radius: 15px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #1565c0;
-            }
-        """)
-        self.toggle_log_btn.clicked.connect(self.toggle_log_panel)
-        
         title_layout.addWidget(title)
         title_layout.addStretch()
-        title_layout.addWidget(self.toggle_log_btn)
         title_layout.setContentsMargins(0, 0, 10, 0)
         
         layout.addLayout(title_layout)
@@ -410,17 +391,6 @@ class MainWindow(QMainWindow):
         )
         self.queue_manager.confirm_response(item_id, reply == QMessageBox.StandardButton.Yes)
 
-    def toggle_log_panel(self):
-        """Toggle log panel visibility"""
-        if self.log_panel.isVisible():
-            self.log_panel.hide()
-            self.toggle_log_btn.setText("▶")
-            self.toggle_log_btn.setToolTip("Show Log Panel")
-        else:
-            self.log_panel.show()
-            self.toggle_log_btn.setText("◀")
-            self.toggle_log_btn.setToolTip("Hide Log Panel")
-    
     def log(self, message: str, is_error: bool = False):
         """Add message to log panel"""
         self.log_panel.append_line(message, is_error)
