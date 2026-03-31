@@ -1,0 +1,115 @@
+========================================
+  FanFan Gallery-DL - Setup Guide
+========================================
+
+This app lets you download media from Fanbox, Fantia, Patreon,
+and SubscribeStar with a simple point-and-click interface.
+
+Follow these 3 steps to get started.
+
+
+----------------------------------------
+  STEP 1: Install Python
+----------------------------------------
+
+You need Python installed on your computer.
+If you already have it, skip to Step 2.
+
+  1. Go to: https://www.python.org/downloads/
+  2. Click the big yellow "Download Python" button
+  3. Run the installer
+  4. IMPORTANT: Check the box that says "Add Python to PATH"
+     (This is at the bottom of the first installer screen)
+  5. Click "Install Now"
+  6. Wait for it to finish
+
+How to check if Python is already installed:
+  - Press Windows key + R
+  - Type "cmd" and press Enter
+  - Type "python --version" and press Enter
+  - If you see "Python 3.x.x" you're good
+
+
+----------------------------------------
+  STEP 2: Install Dependencies
+----------------------------------------
+
+  1. Double-click "Install Dependencies for FanFan Gallery-DL.bat"
+  2. A black window will appear and install the required packages
+  3. Wait until you see "All dependencies installed successfully!"
+  4. Press any key to close the window
+
+You only need to do this once.
+
+
+----------------------------------------
+  STEP 3: Run the App
+----------------------------------------
+
+  1. Double-click "START FanFan Gallery-DL.bat"
+  2. The app window will open
+  3. That's it!
+
+Gallery-dl.exe (the download engine) will be automatically
+downloaded on first launch. No manual setup needed.
+
+
+----------------------------------------
+  FIRST TIME SETUP (inside the app)
+----------------------------------------
+
+Before you can download anything, you need to set up your
+cookies so the app can access your subscriptions:
+
+  1. Go to Settings > Credentials
+  2. Click "How to get cookies" on any platform
+  3. Follow the step-by-step guide
+  4. Paste your cookies and click "Save Cookies"
+  5. Click "Test Connection" to make sure it works
+
+After that, go to the Downloader tab, paste a creator's URL,
+and start downloading!
+
+
+----------------------------------------
+  TROUBLESHOOTING
+----------------------------------------
+
+"Python is not recognized"
+  -> You didn't check "Add Python to PATH" during install.
+     Reinstall Python and make sure to check that box.
+
+"pip is not recognized"
+  -> Same as above. Reinstall Python with "Add to PATH" checked.
+
+"Install failed" or permission errors
+  -> Right-click the install bat file and select "Run as Administrator"
+
+App won't start / crashes immediately
+  -> Make sure you ran the install dependencies step first.
+  -> Try running from command line to see the error:
+     Open cmd, navigate to this folder, type: python main.py
+
+Gallery-dl not downloading
+  -> Your cookies may have expired. Re-export them from your
+     browser and save them again in Settings > Credentials.
+
+
+----------------------------------------
+  FOLDER STRUCTURE
+----------------------------------------
+
+You don't need to touch most of these files:
+
+  START FanFan Gallery-DL.bat          <- Double-click to run
+  Install Dependencies for *.bat   <- Run once to set up
+  How to Install and Run.txt       <- You're reading this
+
+  bin/                             <- Gallery-dl engine (auto-downloaded)
+  config/                          <- App configuration files
+  Credentials and User Data/       <- Your settings and artist database
+
+  core/                            <- App internals (don't modify)
+  ui/                              <- App interface (don't modify)
+  db/                              <- Database code (don't modify)
+

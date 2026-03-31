@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# User data (never commit credentials or personal database)
+Credentials and User Data/
+
+# Gallery-dl binary (auto-downloaded on first run)
+bin/
+
+# Development debris
+Debris/
+
+# Claude Code
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Test output folders
+test */
