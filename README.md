@@ -68,7 +68,6 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 - Select individual posts and files — no more all-or-nothing
 - Date range filters, name search, Post ID search, tier sorting
 - Color-coded posts: green = paid (accessible), orange = locked, black = free
-- Fantia mixed-tier detection: shows `[FREE + 300JPY LOCKED]` for posts with both free and paid content
 
 ### Cross-Check (Never Miss Anything Again)
 - Compare scanned posts against your local files
@@ -84,9 +83,8 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 
 ### Smart Organization
 - Naming presets — save and switch between naming patterns
-- ZIP auto-extraction with naming pattern applied to extracted files
-- Category capitalization (`[Fanbox]` not `[fanbox]`)
-- Per-creator download folders
+- ZIP auto-extraction with naming pattern applied to extracted files (still not fully developed yet)
+- Per-creator download folders and per post folder organization
 
 ### Cookie Authentication
 - Step-by-step cookie guides for every platform
@@ -106,7 +104,7 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 
 This is not just a naming convention. It's a system.
 
-When your files are named `RIM しろサカナ [2026-02-24] PostTitle [P11458849] [Fanbox].mp4`, you get:
+When your files are named `Whitefish しろサカナ [2026-02-24] PostTitle [P11458849] [Fanbox].mp4`, you get:
 
 1. **Self-describing files** — move them anywhere and they still tell you everything
 2. **Chronological sorting** — your OS sorts them by date automatically
