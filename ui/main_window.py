@@ -17,7 +17,8 @@ from ui.settings.naming import NamingPage
 from ui.settings.credentials import CredentialsPage
 from ui.settings.updates import UpdatesPage
 from ui.settings.data import DataPage
-from ui.settings.sounds import SoundsDisplayPage
+from ui.settings.general import GeneralPage
+from ui.settings.downloader import DownloaderPage as DownloaderSettingsPage
 from core.logger import logger
 
 
@@ -167,13 +168,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(separator)
 
         # Settings pages
+        self.btn_general = SidebarButton("General")
+        self.btn_downloader_settings = SidebarButton("Downloader")
         self.btn_naming = SidebarButton("Naming")
         self.btn_credentials = SidebarButton("Credentials")
-        self.btn_sounds = SidebarButton("Sounds & Display")
         self.btn_updates = SidebarButton("Updates")
         self.btn_data = SidebarButton("Data")
 
-        for btn in [self.btn_naming, self.btn_credentials, self.btn_sounds, self.btn_updates, self.btn_data]:
+        for btn in [self.btn_general, self.btn_downloader_settings, self.btn_naming, self.btn_credentials, self.btn_updates, self.btn_data]:
             layout.addWidget(btn)
             self.nav_buttons.append(btn)
             btn.clicked.connect(self.on_nav_clicked)
@@ -331,24 +333,26 @@ class MainWindow(QMainWindow):
         self.artists_page = ArtistsPage(self.db)
 
         # Settings pages
+        self.general_page = GeneralPage(self.db)
+        self.downloader_settings_page = DownloaderSettingsPage(self.db)
         self.naming_page = NamingPage(self.db)
         self.credentials_page = CredentialsPage(self.db)
-        self.sounds_page = SoundsDisplayPage(self.db)
         self.updates_page = UpdatesPage(self.db)
         self.data_page = DataPage(self.db)
 
         # Add to stack (order must match button order)
         pages = [
-            self.dashboard_page,    # 0
-            self.downloader_page,   # 1
-            self.queue_page,        # 2
-            self.crosscheck_page,   # 3
-            self.artists_page,      # 4
-            self.naming_page,       # 5
-            self.credentials_page,  # 6
-            self.sounds_page,       # 7
-            self.updates_page,      # 8
-            self.data_page          # 9
+            self.dashboard_page,            # 0
+            self.downloader_page,           # 1
+            self.queue_page,                # 2
+            self.crosscheck_page,           # 3
+            self.artists_page,              # 4
+            self.general_page,              # 5
+            self.downloader_settings_page,  # 6
+            self.naming_page,               # 7
+            self.credentials_page,          # 8
+            self.updates_page,              # 9
+            self.data_page                  # 10
         ]
 
         for page in pages:

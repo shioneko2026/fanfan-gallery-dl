@@ -2,8 +2,7 @@
 Settings - Updates management
 """
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                            QPushButton, QGroupBox, QCheckBox, QSpinBox,
-                            QFileDialog, QLineEdit, QMessageBox)
+                            QPushButton, QGroupBox, QCheckBox, QMessageBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from core.gallery_dl_manager import GalleryDLManager
 from datetime import datetime
@@ -175,65 +174,6 @@ class UpdatesPage(QWidget):
         app_group.setLayout(app_layout)
         layout.addWidget(app_group)
 
-        # Download preferences
-        pref_group = QGroupBox("Download Preferences")
-        pref_group.setStyleSheet(gdl_group.styleSheet())
-
-        pref_layout = QVBoxLayout()
-
-        # Default save folder
-        folder_layout = QHBoxLayout()
-        folder_layout.addWidget(QLabel("Default save folder:"))
-
-        self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Select default download location...")
-        self.folder_input.setStyleSheet("padding: 8px;")
-
-        browse_btn = QPushButton("Browse")
-        browse_btn.clicked.connect(self.browse_folder)
-
-        folder_layout.addWidget(self.folder_input, 1)
-        folder_layout.addWidget(browse_btn)
-
-        pref_layout.addLayout(folder_layout)
-
-        # Concurrent downloads
-        concurrent_layout = QHBoxLayout()
-        concurrent_layout.addWidget(QLabel("Concurrent downloads:"))
-
-        self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setMinimum(1)
-        self.concurrent_spin.setMaximum(5)
-        self.concurrent_spin.setValue(2)
-        self.concurrent_spin.setStyleSheet("padding: 5px;")
-
-        concurrent_layout.addWidget(self.concurrent_spin)
-        concurrent_layout.addStretch()
-
-        pref_layout.addLayout(concurrent_layout)
-
-        pref_group.setLayout(pref_layout)
-        layout.addWidget(pref_group)
-
-        # Save button
-        save_btn = QPushButton("Save Preferences")
-        save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4caf50;
-                color: white;
-                border: none;
-                padding: 12px 30px;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        save_btn.clicked.connect(self.save_preferences)
-
-        layout.addWidget(save_btn)
         layout.addStretch()
 
         # Load current settings
@@ -241,40 +181,11 @@ class UpdatesPage(QWidget):
 
     def load_settings(self):
         """Load current settings from database"""
-        default_folder = self.db.get_setting("default_save_folder", "")
-        concurrent = int(self.db.get_setting("concurrent_downloads", "2"))
         auto_notify = self.db.get_setting("auto_notify_updates", "true") == "true"
-
-        self.folder_input.setText(default_folder)
-        self.concurrent_spin.setValue(concurrent)
         self.auto_notify_check.setChecked(auto_notify)
 
         # Load gallery-dl version
         self.refresh_version_info()
-
-    def save_preferences(self):
-        """Save preferences to database and propagate to running systems"""
-        self.db.set_setting("default_save_folder", self.folder_input.text())
-        self.db.set_setting("concurrent_downloads", str(self.concurrent_spin.value()))
-        self.db.set_setting("auto_notify_updates", "true" if self.auto_notify_check.isChecked() else "false")
-
-        # Propagate concurrent downloads to active queue manager
-        main_window = self.window()
-        if hasattr(main_window, 'downloads_page'):
-            main_window.downloads_page.queue_manager.max_concurrent = self.concurrent_spin.value()
-
-        QMessageBox.information(self, "Saved", "Preferences saved! Changes apply to new downloads.\nAlready-queued downloads keep their original settings.")
-
-    def browse_folder(self):
-        """Open folder browser dialog"""
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Default Download Folder",
-            self.folder_input.text() or ""
-        )
-
-        if folder:
-            self.folder_input.setText(folder)
 
     def refresh_version_info(self):
         """Refresh gallery-dl version information"""

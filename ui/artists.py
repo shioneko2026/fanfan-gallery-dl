@@ -66,6 +66,12 @@ class AddEditArtistDialog(QDialog):
 
         layout.addLayout(form)
 
+        # Pre-fill default save folder for new creators
+        if not self.artist:
+            default_folder = self.db.get_setting("default_save_folder", "")
+            if default_folder:
+                self.folder_input.setText(default_folder)
+
         # Pre-fill if editing
         if self.artist:
             self.name_input.setText(self.artist['display_name'])

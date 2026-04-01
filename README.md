@@ -26,7 +26,7 @@ FanFan Gallery-DL fixes all of this.
 
 **Scan before you download.** See every post a creator has made — with titles, dates, prices, and file counts — before downloading a single byte.
 
-**Pick exactly what you want.** Check the posts you want, uncheck the rest. Filter by date, search by name, sort by tier. Download only what you selected.
+**Pick exactly what you want.** Check the posts you want, uncheck the rest. Filter by date, search by name, sort by tier or file count. Download only what you selected.
 
 **Cross-Check what you have.** The killer feature: scan a creator, point to your download folder, and instantly see what's missing, what's present, and what's locked behind a paywall. Then download only the gaps.
 
@@ -44,8 +44,8 @@ FanFan Gallery-DL fixes all of this.
 |----------|--------|
 | Pixiv Fanbox | Tested |
 | Fantia | Tested |
-| Patreon | Coming soon |
-| SubscribeStar | Coming soon |
+| Patreon | Planned |
+| SubscribeStar | Planned |
 
 ---
 
@@ -64,10 +64,12 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 ## Features
 
 ### Download with Precision
-- Scan creator pages and preview every post in a checklist tree
-- Select individual posts and files — no more all-or-nothing
-- Date range filters, name search, Post ID search, tier sorting
+- Scan creator pages and preview every post in a flat table with file counts
+- Select posts by checkbox — expand any post to see its file list (videos, images, archives)
+- Date range filters, name search, Post ID search, sort by date/title/tier/file count
+- "Deselect image-only posts" toggle for video-focused downloading
 - Color-coded posts: green = paid (accessible), orange = locked, black = free
+- Locked/paid posts are still selectable if you're subscribed — the app won't block you
 
 ### Cross-Check (Never Miss Anything Again)
 - Compare scanned posts against your local files
@@ -76,15 +78,16 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 - Works by matching `[P{post_id}]` in filenames — powered by Universal Standard naming
 
 ### Universal Standard Naming
-- Every file named consistently: `Creator [Date] Title [PostID] [Platform].ext`
+- Every file named consistently: `Creator [Date] PostTitle Filename [PostID] [Platform].ext`
 - Folders organized chronologically
 - Post IDs embedded for traceability and cross-checking
 - Community compatible — when everyone uses the same pattern, collections are interoperable
 
 ### Smart Organization
 - Naming presets — save and switch between naming patterns
-- ZIP auto-extraction with naming pattern applied to extracted files (still not fully developed yet)
-- Per-creator download folders and per post folder organization
+- ZIP auto-extraction with naming pattern applied to extracted files
+- Per-creator download folders and per-post folder organization
+- Default save folder auto-applied when adding new creators
 
 ### Cookie Authentication
 - Step-by-step cookie guides for every platform
@@ -95,8 +98,32 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 ### Quality of Life
 - Dashboard with creator stats, cookie health, and recent scans
 - Creator management with multi-platform profiles
-- Notification beeps with volume and pitch control
-- Dual log panel (App Log + Raw Output) for transparency
+- **General settings** — notification sounds
+- **Downloader settings** — default save folder, concurrent downloads, per-platform rate limit / sleep / retry controls
+- Dual log panel (App Log + Raw Output) — App Log shows filenames and download speed as files complete
+- Single download queue item per scan — one progress bar, accurate tracking
+- Abort a download and re-download immediately from the same scan results — no rescan needed
+
+---
+
+## Known Limitations
+
+These are constraints of gallery-dl (the download engine), not bugs in FanFan:
+
+| Limitation | Details |
+|-----------|---------|
+| **No per-file filtering** | Gallery-dl downloads entire posts. You can select/deselect posts, but not individual files within a post. The file list under each post is for preview only. |
+| **No file size info before download** | Gallery-dl's scan mode returns filenames and metadata but not file sizes. Size is only known after downloading. |
+| **Downloads are slow by default — this is intentional** | Gallery-dl enforces sleep delays between requests to avoid getting your account flagged or rate-limited by the platform. Out of the box, Fanbox and Fantia use a 1.0s delay between files. A large post with 50 files will take ~50 seconds minimum. You can reduce this in Settings → Downloader, but do so at your own risk. |
+| **Downloader performance settings are untested** | The per-platform rate limit, sleep, and retry controls in Settings → Downloader are new and have not been extensively tested. Use the defaults until you know what you're doing. |
+| **One platform at a time** | Each scan/download targets one creator URL. Batch multi-creator downloads are planned but not yet implemented. |
+| **Windows only** | Uses Windows Credential Manager for secure cookie storage and `winsound` for notifications. |
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 ---
 
@@ -104,7 +131,7 @@ See `How to Install and Run.txt` for a detailed walkthrough.
 
 This is not just a naming convention. It's a system.
 
-When your files are named `Whitefish しろサカナ [2026-02-24] PostTitle [P11458849] [Fanbox].mp4`, you get:
+When your files are named `Whitefish しろサカナ [2026-02-24] PostTitle filename [P11458849] [Fanbox].mp4`, you get:
 
 1. **Self-describing files** — move them anywhere and they still tell you everything
 2. **Chronological sorting** — your OS sorts them by date automatically

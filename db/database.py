@@ -148,7 +148,12 @@ class Database:
             "conflict_action": "append_number",
             "concurrent_downloads": "2",
             "auto_notify_updates": "true",
-            "default_save_folder": ""
+            "default_save_folder": "",
+            "fanbox_rate_limit": "", "fanbox_sleep_request": "1.0", "fanbox_retries": "4",
+            "fantia_rate_limit": "", "fantia_sleep_request": "1.0", "fantia_retries": "4",
+            "pixiv_rate_limit": "", "pixiv_sleep_request": "0.5", "pixiv_retries": "4",
+            "patreon_rate_limit": "", "patreon_sleep_request": "0.5", "patreon_retries": "4",
+            "subscribestar_rate_limit": "", "subscribestar_sleep_request": "0.5", "subscribestar_retries": "4"
         }
 
         cursor = self.conn.cursor()
@@ -164,7 +169,7 @@ class Database:
         cursor = self.conn.cursor()
 
         us_folder = "{creator_name} {creator_jp} [{today}] [{category}]/{creator_name} {creator_jp} [{date:%Y-%m-%d}] {post_title} [P{post_id}] [{category}]"
-        us_file = "{creator_name} {creator_jp} [{date:%Y-%m-%d}] {filename} [P{post_id}] [{category}].{extension}"
+        us_file = "{creator_name} {creator_jp} [{date:%Y-%m-%d}] {post_title} {filename} [P{post_id}] [{category}].{extension}"
 
         existing = cursor.execute(
             "SELECT id, folder_pattern FROM naming_presets WHERE is_default = 1"
@@ -182,6 +187,16 @@ class Database:
                 "UPDATE naming_presets SET folder_pattern = ?, file_pattern = ? WHERE id = ?",
                 (us_folder, us_file, existing[0])
             )
+        elif existing:
+            # Migrate to add {post_title} if missing from file pattern
+            cur_file = cursor.execute(
+                "SELECT file_pattern FROM naming_presets WHERE is_default = 1"
+            ).fetchone()
+            if cur_file and "{post_title}" not in (cur_file[0] or ""):
+                cursor.execute(
+                    "UPDATE naming_presets SET file_pattern = ? WHERE id = ?",
+                    (us_file, existing[0])
+                )
 
         # Also migrate settings table patterns
         for key in ("folder_pattern", "file_pattern"):

@@ -19,8 +19,10 @@ class DownloaderPage(QWidget):
         self.db = db
         self.manager = GalleryDLManager()
         self.queue_manager = queue_manager
+        self._current_item_id = None
 
         self.init_ui()
+        self.queue_manager.item_status_changed.connect(self._on_item_status_changed)
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -155,33 +157,15 @@ class DownloaderPage(QWidget):
         self.results_label.setStyleSheet("color: #999; padding: 8px;")
         layout.addWidget(self.results_label)
 
-        # Selection controls — row 1: buttons
-        sel_layout = QHBoxLayout()
-
-        self.select_all_btn = QPushButton("Select All")
-        self.select_all_btn.clicked.connect(lambda: self._set_all_checked(True))
-        self.select_all_btn.setStyleSheet("padding: 4px 12px;")
-        self.select_all_btn.setVisible(False)
-
-        self.deselect_all_btn = QPushButton("Deselect All")
-        self.deselect_all_btn.clicked.connect(lambda: self._set_all_checked(False))
-        self.deselect_all_btn.setStyleSheet("padding: 4px 12px;")
-        self.deselect_all_btn.setVisible(False)
-
+        # Summary label (shows count + type breakdown after scan)
         self.selected_count_label = QLabel("")
         self.selected_count_label.setStyleSheet("color: #666; font-size: 12px;")
+        self.selected_count_label.setVisible(False)
 
-        sel_layout.addWidget(self.select_all_btn)
-        sel_layout.addWidget(self.deselect_all_btn)
-        sel_layout.addStretch()
-        sel_layout.addWidget(self.selected_count_label)
-
-        layout.addLayout(sel_layout)
-
-        # Selection controls — row 2: toggles and sort
+        # Toolbar — toggles, filters, sort (above tree)
         toggle_layout = QHBoxLayout()
 
-        self.skip_images_check = QCheckBox("Skip images (videos only)")
+        self.skip_images_check = QCheckBox("Deselect image-only posts")
         self.skip_images_check.setVisible(False)
         self.skip_images_check.toggled.connect(self._on_skip_images_toggled)
 
@@ -207,7 +191,8 @@ class DownloaderPage(QWidget):
         self.sort_combo.addItems([
             "Sort: Newest first", "Sort: Oldest first",
             "Sort: Title A-Z", "Sort: Post ID",
-            "Sort: Tier (free first)", "Sort: Tier (expensive first)"
+            "Sort: Tier (free first)", "Sort: Tier (expensive first)",
+            "Sort: Most files", "Sort: Fewest files"
         ])
         self.sort_combo.setVisible(False)
         self.sort_combo.setFixedWidth(200)
@@ -215,30 +200,21 @@ class DownloaderPage(QWidget):
 
         toggle_layout.addWidget(self.skip_images_check)
         toggle_layout.addWidget(self.flat_videos_check)
-        toggle_layout.addStretch()
-        toggle_layout.addWidget(self.name_filter)
-        toggle_layout.addWidget(self.post_id_filter)
         toggle_layout.addWidget(self.sort_combo)
+        toggle_layout.addStretch()
+        toggle_layout.addWidget(self.selected_count_label)
 
         layout.addLayout(toggle_layout)
 
-        # Tree widget for post/file checklist
+        # Results tree — expandable rows, matching crosscheck table style
         self.results_tree = QTreeWidget()
-        self.results_tree.setHeaderLabels(["Title", "Date", "Post ID", "Type"])
-        self.results_tree.setColumnCount(4)
-        self.results_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.results_tree.setColumnWidth(0, 300)
-        self.results_tree.setColumnWidth(1, 100)
-        self.results_tree.setColumnWidth(2, 100)
-        self.results_tree.header().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.results_tree.setHeaderLabels(["Title", "Date", "Post ID", "Type", "Files"])
+        self.results_tree.setColumnCount(5)
+        self.results_tree.setAlternatingRowColors(True)
         self.results_tree.setStyleSheet("""
             QTreeWidget {
-                border: 1px solid #e0e0e0;
-                border-radius: 4px;
-                font-size: 13px;
-            }
-            QTreeWidget::item {
-                padding: 4px 2px;
+                font-family: 'Segoe UI';
+                font-size: 12px;
             }
             QTreeWidget::item:hover {
                 background-color: #f0f7ff;
@@ -248,44 +224,59 @@ class DownloaderPage(QWidget):
                 color: inherit;
             }
         """)
+        header = self.results_tree.header()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.results_tree.setColumnWidth(1, 100)
+        self.results_tree.setColumnWidth(2, 100)
+        self.results_tree.setColumnWidth(3, 140)
+        self.results_tree.setColumnWidth(4, 60)
         self.results_tree.setVisible(False)
         self.results_tree.itemChanged.connect(self._on_tree_item_changed)
         layout.addWidget(self.results_tree, 1)
 
-        # Download button
+        # Action buttons — below tree, matching crosscheck layout
         action_layout = QHBoxLayout()
 
         self.download_btn = QPushButton("Download Selected")
         self.download_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4caf50;
-                color: white;
-                border: none;
-                padding: 10px 30px;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 14px;
+                background-color: #4caf50; color: white; border: none;
+                padding: 10px 20px; border-radius: 4px; font-weight: bold;
+                font-family: 'Segoe UI';
             }
             QPushButton:hover { background-color: #45a049; }
-            QPushButton:disabled { background-color: #ccc; }
+            QPushButton:disabled { background-color: #ccc; color: #888; }
         """)
         self.download_btn.clicked.connect(self.on_download)
         self.download_btn.setEnabled(False)
 
+        self.select_all_btn = QPushButton("Select All")
+        self.select_all_btn.setEnabled(False)
+        self.select_all_btn.setStyleSheet("padding: 10px 16px; font-family: 'Segoe UI';")
+        self.select_all_btn.clicked.connect(lambda: self._set_all_checked(True))
+
+        self.deselect_all_btn = QPushButton("Deselect All")
+        self.deselect_all_btn.setEnabled(False)
+        self.deselect_all_btn.setStyleSheet("padding: 10px 16px; font-family: 'Segoe UI';")
+        self.deselect_all_btn.clicked.connect(lambda: self._set_all_checked(False))
+
+        self.expand_all_btn = QPushButton("Expand All")
+        self.expand_all_btn.setEnabled(False)
+        self.expand_all_btn.setStyleSheet("padding: 10px 16px; font-family: 'Segoe UI';")
+        self.expand_all_btn.clicked.connect(self._on_toggle_expand)
+
         self.clear_btn = QPushButton("Clear")
-        self.clear_btn.setStyleSheet("""
-            QPushButton {
-                padding: 10px 20px;
-                border-radius: 4px;
-                font-size: 14px;
-                font-family: 'Segoe UI';
-            }
-        """)
+        self.clear_btn.setStyleSheet("padding: 10px 20px; font-family: 'Segoe UI';")
         self.clear_btn.clicked.connect(self.on_clear)
 
-        action_layout.addStretch()
-        action_layout.addWidget(self.clear_btn)
         action_layout.addWidget(self.download_btn)
+        action_layout.addWidget(self.select_all_btn)
+        action_layout.addWidget(self.deselect_all_btn)
+        action_layout.addWidget(self.expand_all_btn)
+        action_layout.addWidget(self.clear_btn)
+        action_layout.addStretch()
+        action_layout.addWidget(self.name_filter)
+        action_layout.addWidget(self.post_id_filter)
 
         layout.addLayout(action_layout)
 
@@ -422,16 +413,27 @@ class DownloaderPage(QWidget):
                         # Handles both Fanbox (id, title, feeRequired) and
                         # Fantia (post_id, post_title, plan.price) field names
                         meta = item[1] if isinstance(item[1], dict) else {}
-                        post_id = str(meta.get('id') or meta.get('post_id', 'unknown'))
+                        # Fantia uses post_id, Fanbox uses id — check platform first
+                        category = meta.get('category', '').lower()
+                        if category == 'fantia':
+                            post_id = str(meta.get('post_id') or meta.get('id', 'unknown'))
+                        else:
+                            post_id = str(meta.get('id') or meta.get('post_id', 'unknown'))
                         post_title = meta.get('title') or meta.get('post_title', '')
 
                         # Detect which metadata field holds the post ID
                         # (used later for --filter when downloading selected posts)
-                        if not hasattr(self, '_post_id_field') or self._post_id_field == 'id':
-                            if 'id' in meta and meta['id']:
-                                self._post_id_field = 'id'
-                            elif 'post_id' in meta and meta['post_id']:
+                        # Platform-specific: Fantia uses post_id, Fanbox uses id
+                        category = meta.get('category', '').lower()
+                        if category == 'fantia':
+                            self._post_id_field = 'post_id'
+                        elif category == 'fanbox':
+                            self._post_id_field = 'id'
+                        elif not hasattr(self, '_post_id_field') or self._post_id_field == 'id':
+                            if 'post_id' in meta and meta['post_id']:
                                 self._post_id_field = 'post_id'
+                            elif 'id' in meta and meta['id']:
+                                self._post_id_field = 'id'
                             elif 'num' in meta and meta['num']:
                                 self._post_id_field = 'num'
 
@@ -442,9 +444,10 @@ class DownloaderPage(QWidget):
 
                         # Restricted: Fanbox uses isRestricted, Fantia uses content_category
                         restricted = meta.get('isRestricted', False)
-                        # For Fantia, "catchable"/"uncatchable" content_category means locked
+                        # For Fantia, only "uncatchable" means locked
+                        # "catchable" means accessible at your subscription tier
                         content_cat = meta.get('content_category', '')
-                        if content_cat in ('catchable', 'uncatchable'):
+                        if content_cat == 'uncatchable':
                             restricted = True
 
                         # Build post URL for selective downloading
@@ -471,7 +474,7 @@ class DownloaderPage(QWidget):
                             post = posts[post_id]
                             if fee > post.get('max_fee', 0):
                                 post['max_fee'] = fee
-                            if content_cat in ('catchable', 'uncatchable'):
+                            if content_cat == 'uncatchable':
                                 post['has_locked_content'] = True
                             if not post['title'] and post_title:
                                 post['title'] = post_title
@@ -481,7 +484,12 @@ class DownloaderPage(QWidget):
                     elif item_type == 3 and len(item) >= 3:
                         # File entry — has [3, url, metadata]
                         meta = item[2] if isinstance(item[2], dict) else {}
-                        post_id = str(meta.get('id') or meta.get('post_id', 'unknown'))
+                        # Match post ID extraction to platform (same logic as type 2)
+                        file_category = meta.get('category', '').lower()
+                        if file_category == 'fantia':
+                            post_id = str(meta.get('post_id') or meta.get('id', 'unknown'))
+                        else:
+                            post_id = str(meta.get('id') or meta.get('post_id', 'unknown'))
                         ext = meta.get('extension', '').lower().lstrip('.')
                         filename = meta.get('filename', '?')
 
@@ -731,47 +739,27 @@ class DownloaderPage(QWidget):
         else:
             self.db.set_setting("_flat_download", "false")
 
-        # Platform-specific download strategy:
-        # - Fanbox: individual post URLs cause 403, so use creator URL + post ID filter
-        # - Fantia/others: individual post URLs work fine, so use them directly (much faster)
-        use_filter = platform_id in ('fanbox',)
-
         # Count expected files and build post title map from the scan tree
         expected_files, post_titles = self._count_checked_files_and_titles()
 
-        if use_filter:
-            # Fanbox: single download with creator URL + filter
-            post_id_field = getattr(self, '_post_id_field', 'id')
-            item_id = self.queue_manager.add_download(
-                url=scan_url,
-                output_dir=output_path,
-                creator_name=creator_id,
-                platform=platform_id,
-                post_ids=checked_post_ids,
-                post_id_field=post_id_field,
-                expected_files=expected_files,
-                post_titles=post_titles
-            )
-            if main_window:
-                main_window.log(f"Queued: {scan_url} ({len(checked_post_ids)} posts selected, {expected_files} files expected)")
-        else:
-            # Fantia/others: queue each post URL individually (fast, no full crawl)
-            checked_urls = self._get_checked_post_urls()
-            for post_url in checked_urls:
-                # Count files for this specific post
-                post_file_count = self._count_files_for_post_url(post_url)
-                item_id = self.queue_manager.add_download(
-                    url=post_url,
-                    output_dir=output_path,
-                    creator_name=creator_id,
-                    platform=platform_id,
-                    expected_files=post_file_count,
-                    post_titles=post_titles
-                )
-                if main_window:
-                    main_window.log(f"Queued: {post_url} ({post_file_count} files expected)")
+        # Single download with creator URL + post ID filter
+        # This creates one queue item with one progress bar (no per-post spawning)
+        post_id_field = getattr(self, '_post_id_field', 'id')
+        item_id = self.queue_manager.add_download(
+            url=scan_url,
+            output_dir=output_path,
+            creator_name=creator_id,
+            platform=platform_id,
+            post_ids=checked_post_ids,
+            post_id_field=post_id_field,
+            expected_files=expected_files,
+            post_titles=post_titles
+        )
+        self._current_item_id = item_id
+        if main_window:
+            main_window.log(f"Queued: {scan_url} ({len(checked_post_ids)} posts selected, {expected_files} files expected)")
 
-        # Disable download button until next scan
+        # Disable download button until download finishes or is aborted
         self.download_btn.setEnabled(False)
 
         # Switch to queue tab
@@ -780,35 +768,21 @@ class DownloaderPage(QWidget):
             main_window.log("Downloads will start automatically — check Download Queue tab")
             main_window.show_page(2)
 
+    def _on_item_status_changed(self, item_id: str, status: str):
+        """Re-enable Download button when the active download ends"""
+        if item_id != self._current_item_id:
+            return
+        terminal_statuses = {"cancelled", "failed", "completed", "partial"}
+        if status.lower() in terminal_statuses:
+            if self.results_tree.topLevelItemCount() > 0:
+                self._update_selected_count()
+
     def _populate_results_tree(self, posts, json_data):
         """Build the checklist tree from scan results"""
         self.results_tree.blockSignals(True)
         self.results_tree.clear()
 
-        # Store file URL mapping: tree item -> file URL
-        self._file_url_map = {}
         self._scan_posts = posts
-
-        VIDEO_EXTS = {'mp4', 'webm', 'mkv', 'avi', 'mov', 'm4v', 'flv', 'wmv'}
-
-        # Build a map of post_id -> list of file URLs from JSON data
-        post_file_urls = {}
-        for item in json_data:
-            if not isinstance(item, list) or len(item) < 3 or item[0] != 3:
-                continue
-            file_url = item[1]
-            meta = item[2] if isinstance(item[2], dict) else {}
-            post_id = str(meta.get('id', 'unknown'))
-            is_cover = meta.get('isCoverImage', False)
-            if is_cover:
-                continue
-            if post_id not in post_file_urls:
-                post_file_urls[post_id] = []
-            post_file_urls[post_id].append({
-                'url': file_url,
-                'filename': meta.get('filename', '?'),
-                'extension': meta.get('extension', ''),
-            })
 
         for post_id, post in posts.items():
             # Post row
@@ -834,222 +808,223 @@ class DownloaderPage(QWidget):
             else:
                 fee_str = "[FREE]"
 
+            # File count and type breakdown for this post
+            n_vid = len(post['videos'])
+            n_img = len(post['images'])
+            n_zip = len(post['archives'])
+            n_other = len(post['other'])
+            n_total = n_vid + n_img + n_zip + n_other
+
+            # Build file list tooltip
+            file_lines = []
+            for f in post['videos']:
+                file_lines.append(f"[VIDEO] {f}")
+            for f in post['images']:
+                file_lines.append(f"[IMAGE] {f}")
+            for f in post['archives']:
+                file_lines.append(f"[ZIP] {f}")
+            for f in post['other']:
+                file_lines.append(f"[FILE] {f}")
+            file_tooltip = "\n".join(file_lines) if file_lines else "(no files)"
+
             post_item = QTreeWidgetItem()
             post_item.setText(0, f"{title_str}")
             post_item.setText(1, date_str)
             post_item.setText(2, f"P{post_id}")
             post_item.setText(3, fee_str)
+            post_item.setText(4, str(n_total))
             post_item.setToolTip(0, title_str)
+            post_item.setToolTip(4, file_tooltip)
             post_item.setData(0, Qt.ItemDataRole.UserRole, post_id)
             post_item.setData(0, Qt.ItemDataRole.UserRole + 1, post.get('post_url', ''))
             post_item.setData(0, Qt.ItemDataRole.UserRole + 2, max_fee)
+            # Store file count for sorting
+            post_item.setData(4, Qt.ItemDataRole.UserRole, n_total)
+            # Store type counts for summary
+            post_item.setData(4, Qt.ItemDataRole.UserRole + 1, n_img)
+            post_item.setData(4, Qt.ItemDataRole.UserRole + 2, n_vid)
+            post_item.setData(4, Qt.ItemDataRole.UserRole + 3, n_zip)
+            post_item.setData(4, Qt.ItemDataRole.UserRole + 4, n_other)
 
             # Color coding
             if has_locked and not has_files:
-                # Fully locked — orange
+                # Locked/paid — orange, but still selectable (user may be subscribed)
                 orange = QBrush(QColor("#e65100"))
-                for col in range(4):
+                for col in range(5):
                     post_item.setForeground(col, orange)
                 post_item.setCheckState(0, Qt.CheckState.Unchecked)
-                post_item.setFlags(post_item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             elif has_locked and has_files:
                 # Mixed: has free files + locked content — orange-green
-                # Show as checkable (can download the free parts)
                 green = QBrush(QColor("#2e7d32"))
                 orange = QBrush(QColor("#e65100"))
                 post_item.setForeground(0, green)
                 post_item.setForeground(1, green)
                 post_item.setForeground(2, green)
-                post_item.setForeground(3, orange)  # Fee label in orange to show locked portion
+                post_item.setForeground(3, orange)
+                post_item.setForeground(4, green)
                 post_item.setCheckState(0, Qt.CheckState.Checked)
-                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
+                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             elif max_fee > 0 and has_files:
                 # Paid but fully accessible — green
                 green = QBrush(QColor("#2e7d32"))
-                for col in range(4):
+                for col in range(5):
                     post_item.setForeground(col, green)
                 post_item.setCheckState(0, Qt.CheckState.Checked)
-                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
+                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             elif has_files:
                 # Free with files — black (default)
                 post_item.setCheckState(0, Qt.CheckState.Checked)
-                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
+                post_item.setFlags(post_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             else:
                 # Empty post — grey
                 grey = QBrush(QColor("#999999"))
-                for col in range(4):
+                for col in range(5):
                     post_item.setForeground(col, grey)
                 post_item.setCheckState(0, Qt.CheckState.Unchecked)
 
-            # Add file children
-            file_urls = post_file_urls.get(post_id, [])
-            url_idx = 0
-
+            # Add display-only file children (no checkboxes — post-level only)
             for f in post['videos']:
                 child = QTreeWidgetItem(post_item)
                 child.setText(0, f)
                 child.setToolTip(0, f)
                 child.setText(3, "VIDEO")
-                child.setForeground(3, Qt.GlobalColor.cyan)
-                if not post['restricted']:
-                    child.setCheckState(0, Qt.CheckState.Checked)
-                    if url_idx < len(file_urls):
-                        self._file_url_map[id(child)] = file_urls[url_idx]['url']
-                        url_idx += 1
+                child.setForeground(3, QBrush(QColor("#00acc1")))
 
             for f in post['images']:
                 child = QTreeWidgetItem(post_item)
                 child.setText(0, f)
                 child.setToolTip(0, f)
                 child.setText(3, "IMAGE")
-                if not post['restricted']:
-                    child.setCheckState(0, Qt.CheckState.Checked)
-                    if url_idx < len(file_urls):
-                        self._file_url_map[id(child)] = file_urls[url_idx]['url']
-                        url_idx += 1
+                child.setForeground(3, QBrush(QColor("#888888")))
 
             for f in post['archives']:
                 child = QTreeWidgetItem(post_item)
                 child.setText(0, f)
                 child.setToolTip(0, f)
                 child.setText(3, "ZIP")
-                if not post['restricted']:
-                    child.setCheckState(0, Qt.CheckState.Checked)
-                    if url_idx < len(file_urls):
-                        self._file_url_map[id(child)] = file_urls[url_idx]['url']
-                        url_idx += 1
+                child.setForeground(3, QBrush(QColor("#e65100")))
 
             for f in post['other']:
                 child = QTreeWidgetItem(post_item)
                 child.setText(0, f)
                 child.setToolTip(0, f)
                 child.setText(3, "FILE")
-                if not post['restricted']:
-                    child.setCheckState(0, Qt.CheckState.Checked)
-                    if url_idx < len(file_urls):
-                        self._file_url_map[id(child)] = file_urls[url_idx]['url']
-                        url_idx += 1
 
             self.results_tree.addTopLevelItem(post_item)
-
-        self.results_tree.expandAll()
         self.results_tree.blockSignals(False)
 
         # Show controls
         self.results_tree.setVisible(True)
-        self.select_all_btn.setVisible(True)
-        self.deselect_all_btn.setVisible(True)
+        self.selected_count_label.setVisible(True)
         self.skip_images_check.setVisible(True)
         self.flat_videos_check.setVisible(True)
+        self.select_all_btn.setEnabled(True)
+        self.deselect_all_btn.setEnabled(True)
+        self.expand_all_btn.setEnabled(True)
         self.sort_combo.setVisible(True)
         self.post_id_filter.setVisible(True)
         self.name_filter.setVisible(True)
         self.results_label.setText("Select posts and files to download:")
         self._update_selected_count()
 
-    def _on_tree_item_changed(self, item, column):
-        """Handle checkbox changes — propagate parent/child state"""
-        self.results_tree.blockSignals(True)
+    def _on_toggle_expand(self):
+        """Toggle expand/collapse all posts to show/hide file lists"""
+        # Check if any item is currently expanded
+        any_expanded = False
+        for i in range(self.results_tree.topLevelItemCount()):
+            if self.results_tree.topLevelItem(i).isExpanded():
+                any_expanded = True
+                break
 
-        if item.childCount() > 0:
-            # Parent toggled — set all children to same state
-            state = item.checkState(0)
-            for i in range(item.childCount()):
-                child = item.child(i)
-                if child.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                    child.setCheckState(0, state)
+        if any_expanded:
+            self.results_tree.collapseAll()
+            self.expand_all_btn.setText("Expand All")
         else:
-            # Child toggled — update parent state
-            parent = item.parent()
-            if parent:
-                checked = 0
-                total = 0
-                for i in range(parent.childCount()):
-                    child = parent.child(i)
-                    if child.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                        total += 1
-                        if child.checkState(0) == Qt.CheckState.Checked:
-                            checked += 1
+            self.results_tree.expandAll()
+            self.expand_all_btn.setText("Collapse All")
 
-                if checked == 0:
-                    parent.setCheckState(0, Qt.CheckState.Unchecked)
-                elif checked == total:
-                    parent.setCheckState(0, Qt.CheckState.Checked)
-                else:
-                    parent.setCheckState(0, Qt.CheckState.PartiallyChecked)
-
-        self.results_tree.blockSignals(False)
+    def _on_tree_item_changed(self, item, column):
+        """Handle post checkbox changes (file children have no checkboxes)"""
         self._update_selected_count()
 
     def _set_all_checked(self, checked):
-        """Check or uncheck all items"""
+        """Check or uncheck all post items"""
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
         self.results_tree.blockSignals(True)
         for i in range(self.results_tree.topLevelItemCount()):
             post_item = self.results_tree.topLevelItem(i)
             if post_item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
                 post_item.setCheckState(0, state)
-                for j in range(post_item.childCount()):
-                    child = post_item.child(j)
-                    if child.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                        child.setCheckState(0, state)
         self.results_tree.blockSignals(False)
         self._update_selected_count()
 
     def _update_selected_count(self):
-        """Update the selected file count label"""
-        total = 0
-        selected = 0
+        """Update the selected file/post count label with type breakdown"""
+        total_posts = 0
+        selected_posts = 0
+        selected_files = 0
+        n_img = 0
+        n_vid = 0
+        n_zip = 0
+        n_other = 0
+
         for i in range(self.results_tree.topLevelItemCount()):
             post_item = self.results_tree.topLevelItem(i)
-            for j in range(post_item.childCount()):
-                child = post_item.child(j)
-                if child.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                    total += 1
-                    if child.checkState(0) == Qt.CheckState.Checked:
-                        selected += 1
+            if not (post_item.flags() & Qt.ItemFlag.ItemIsUserCheckable):
+                continue
+            total_posts += 1
 
-        self.selected_count_label.setText(f"{selected}/{total} files selected")
-        self.download_btn.setEnabled(selected > 0)
-        self.download_btn.setText(f"Download Selected ({selected})")
+            if post_item.checkState(0) == Qt.CheckState.Checked:
+                selected_posts += 1
+                file_count = post_item.data(4, Qt.ItemDataRole.UserRole) or 0
+                selected_files += file_count
+                n_img += post_item.data(4, Qt.ItemDataRole.UserRole + 1) or 0
+                n_vid += post_item.data(4, Qt.ItemDataRole.UserRole + 2) or 0
+                n_zip += post_item.data(4, Qt.ItemDataRole.UserRole + 3) or 0
+                n_other += post_item.data(4, Qt.ItemDataRole.UserRole + 4) or 0
 
-    def _get_selected_file_urls(self):
-        """Get URLs of all checked files"""
-        urls = []
-        for i in range(self.results_tree.topLevelItemCount()):
-            post_item = self.results_tree.topLevelItem(i)
-            for j in range(post_item.childCount()):
-                child = post_item.child(j)
-                if (child.flags() & Qt.ItemFlag.ItemIsUserCheckable and
-                        child.checkState(0) == Qt.CheckState.Checked):
-                    url = self._file_url_map.get(id(child))
-                    if url:
-                        urls.append(url)
-        return urls
+        # Build type breakdown string
+        parts = []
+        if n_img:
+            parts.append(f"{n_img} images")
+        if n_vid:
+            parts.append(f"{n_vid} videos")
+        if n_zip:
+            parts.append(f"{n_zip} archives")
+        if n_other:
+            parts.append(f"{n_other} other")
+
+        breakdown = f" ({', '.join(parts)})" if parts else ""
+        self.selected_count_label.setText(
+            f"{selected_posts}/{total_posts} posts, {selected_files} files{breakdown}"
+        )
+        self.download_btn.setEnabled(selected_posts > 0)
+        self.download_btn.setText(f"Download Selected ({selected_posts} posts)")
 
     def _on_skip_images_toggled(self, checked):
-        """Toggle image files on/off in the checklist"""
+        """Deselect posts that contain ONLY images (no videos, archives, or other files)"""
         self.results_tree.blockSignals(True)
         for i in range(self.results_tree.topLevelItemCount()):
             post_item = self.results_tree.topLevelItem(i)
-            for j in range(post_item.childCount()):
-                child = post_item.child(j)
-                file_type = child.text(1)
-                if file_type == "IMAGE":
-                    if checked:
-                        child.setCheckState(0, Qt.CheckState.Unchecked)
-                    else:
-                        child.setCheckState(0, Qt.CheckState.Checked)
+            if not (post_item.flags() & Qt.ItemFlag.ItemIsUserCheckable):
+                continue
+            # Check if this post has only images (no videos, archives, or other)
+            n_img = post_item.data(4, Qt.ItemDataRole.UserRole + 1) or 0
+            n_vid = post_item.data(4, Qt.ItemDataRole.UserRole + 2) or 0
+            n_zip = post_item.data(4, Qt.ItemDataRole.UserRole + 3) or 0
+            n_other = post_item.data(4, Qt.ItemDataRole.UserRole + 4) or 0
+            is_image_only = n_img > 0 and n_vid == 0 and n_zip == 0 and n_other == 0
+            if is_image_only:
+                if checked:
+                    post_item.setCheckState(0, Qt.CheckState.Unchecked)
+                else:
+                    post_item.setCheckState(0, Qt.CheckState.Checked)
         self.results_tree.blockSignals(False)
-        # Update parent states
-        for i in range(self.results_tree.topLevelItemCount()):
-            post_item = self.results_tree.topLevelItem(i)
-            if post_item.childCount() > 0:
-                self._on_tree_item_changed(post_item.child(0), 0)
         self._update_selected_count()
 
     def _on_sort_changed(self, index):
-        """Sort the tree by date, title, post ID, or tier"""
+        """Sort the tree by date, title, post ID, tier, or file count"""
         if index == 0:  # Newest first
             self.results_tree.sortItems(1, Qt.SortOrder.DescendingOrder)
         elif index == 1:  # Oldest first
@@ -1059,12 +1034,19 @@ class DownloaderPage(QWidget):
         elif index == 3:  # Post ID
             self.results_tree.sortItems(2, Qt.SortOrder.AscendingOrder)
         elif index in (4, 5):  # Tier sort
-            # Custom sort by fee stored in UserRole+2
             items = []
             while self.results_tree.topLevelItemCount() > 0:
                 items.append(self.results_tree.takeTopLevelItem(0))
             reverse = (index == 5)  # expensive first
             items.sort(key=lambda x: x.data(0, Qt.ItemDataRole.UserRole + 2) or 0, reverse=reverse)
+            for item in items:
+                self.results_tree.addTopLevelItem(item)
+        elif index in (6, 7):  # File count sort
+            items = []
+            while self.results_tree.topLevelItemCount() > 0:
+                items.append(self.results_tree.takeTopLevelItem(0))
+            reverse = (index == 6)  # most files first
+            items.sort(key=lambda x: x.data(4, Qt.ItemDataRole.UserRole) or 0, reverse=reverse)
             for item in items:
                 self.results_tree.addTopLevelItem(item)
 
@@ -1091,7 +1073,7 @@ class DownloaderPage(QWidget):
                 item.setHidden(search not in post_id_text)
 
     def _count_checked_files_and_titles(self):
-        """Count total checked files and build post_id -> title mapping from tree"""
+        """Count expected download files and build post_id -> title mapping from tree."""
         total_files = 0
         post_titles = {}
         for i in range(self.results_tree.topLevelItemCount()):
@@ -1100,45 +1082,16 @@ class DownloaderPage(QWidget):
             post_title = post_item.text(0).split(']')[-1].strip() if ']' in post_item.text(0) else post_item.text(0)
             if post_id:
                 post_titles[str(post_id)] = post_title
-            if post_item.checkState(0) in (Qt.CheckState.Checked, Qt.CheckState.PartiallyChecked):
-                # Count checked child items (files)
-                for j in range(post_item.childCount()):
-                    child = post_item.child(j)
-                    if child.checkState(0) == Qt.CheckState.Checked:
-                        total_files += 1
+            if post_item.checkState(0) == Qt.CheckState.Checked:
+                total_files += post_item.data(4, Qt.ItemDataRole.UserRole) or 0
         return total_files, post_titles
-
-    def _count_files_for_post_url(self, post_url):
-        """Count checked files for a specific post URL"""
-        for i in range(self.results_tree.topLevelItemCount()):
-            post_item = self.results_tree.topLevelItem(i)
-            item_url = post_item.data(0, Qt.ItemDataRole.UserRole + 1)
-            if item_url == post_url:
-                count = 0
-                for j in range(post_item.childCount()):
-                    child = post_item.child(j)
-                    if child.checkState(0) == Qt.CheckState.Checked:
-                        count += 1
-                return count
-        return 0
-
-    def _get_checked_post_urls(self):
-        """Get URLs of all checked posts (legacy — kept for compatibility)"""
-        urls = []
-        for i in range(self.results_tree.topLevelItemCount()):
-            post_item = self.results_tree.topLevelItem(i)
-            if post_item.checkState(0) in (Qt.CheckState.Checked, Qt.CheckState.PartiallyChecked):
-                post_url = post_item.data(0, Qt.ItemDataRole.UserRole + 1)
-                if post_url:
-                    urls.append(post_url)
-        return urls
 
     def _get_checked_post_ids(self):
         """Get IDs of all checked posts (for filter-based selective downloading)"""
         ids = []
         for i in range(self.results_tree.topLevelItemCount()):
             post_item = self.results_tree.topLevelItem(i)
-            if post_item.checkState(0) in (Qt.CheckState.Checked, Qt.CheckState.PartiallyChecked):
+            if post_item.checkState(0) == Qt.CheckState.Checked:
                 post_id = post_item.data(0, Qt.ItemDataRole.UserRole)
                 if post_id:
                     ids.append(post_id)
@@ -1189,8 +1142,10 @@ class DownloaderPage(QWidget):
         self.results_tree.setVisible(False)
         self.results_label.setText("Scan results will appear here after scanning.")
         self.download_btn.setEnabled(False)
-        self.select_all_btn.setVisible(False)
-        self.deselect_all_btn.setVisible(False)
+        self.select_all_btn.setEnabled(False)
+        self.deselect_all_btn.setEnabled(False)
+        self.expand_all_btn.setEnabled(False)
+        self.expand_all_btn.setText("Expand All")
         self.skip_images_check.setVisible(False)
         self.flat_videos_check.setVisible(False)
         self.sort_combo.setVisible(False)
@@ -1198,6 +1153,7 @@ class DownloaderPage(QWidget):
         self.name_filter.setVisible(False)
         self.post_id_filter.clear()
         self.name_filter.clear()
+        self.selected_count_label.setVisible(False)
         self.selected_count_label.setText("")
         self._scan_posts = None
         self._last_scan_url = ""

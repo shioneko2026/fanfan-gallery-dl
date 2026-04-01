@@ -34,13 +34,15 @@ class GalleryDLRunner:
         date_to: Optional[str] = None,
         simulate: bool = False,
         verbose: bool = False,
-        skip_rate_limit: bool = False,
         dump_json: bool = False,
         app_tokens: Optional[Dict[str, str]] = None,
         folder_pattern: Optional[str] = None,
         file_pattern: Optional[str] = None,
         post_ids: Optional[List[str]] = None,
-        post_id_field: str = "id"
+        post_id_field: str = "id",
+        rate_limit: str = "",
+        sleep_request: str = "",
+        download_retries: int = 4
     ) -> tuple[List[str], Optional[Path]]:
         """
         Build gallery-dl command
@@ -111,9 +113,10 @@ class GalleryDLRunner:
         # Post ID filter for selective downloading (uses creator URL + filter
         # instead of individual post URLs, which cause 403 on some platforms)
         if post_ids:
-            # Post IDs are strings in gallery-dl metadata (e.g. "11620895"), so quote them
+            # Use str() wrapper so the filter works whether gallery-dl stores
+            # the ID as int (Fantia post_id) or str (Fanbox id)
             id_list = ', '.join(f'"{pid}"' for pid in post_ids)
-            filter_conditions.append(f"{post_id_field} in ({id_list})")
+            filter_conditions.append(f"str({post_id_field}) in ({id_list})")
 
         # Skip cover images (post thumbnails) — they inflate file counts
         # Fanbox uses isCoverImage, Fantia uses content_category == "thumb"
@@ -212,9 +215,17 @@ class GalleryDLRunner:
         if verbose:
             cmd.append("-v")
         
-        # Skip rate limiting (for testing)
-        if skip_rate_limit:
-            cmd.extend(["--sleep-request", "0"])
+        # Rate limiting and sleep settings
+        if rate_limit:
+            cmd.extend(["--rate", rate_limit])
+        if sleep_request:
+            try:
+                if float(sleep_request) > 0:
+                    cmd.extend(["--sleep-request", sleep_request])
+            except (ValueError, TypeError):
+                pass
+        if download_retries != 4:
+            cmd.extend(["--retries", str(download_retries)])
 
         # URL
         cmd.append(url)
@@ -283,7 +294,10 @@ class GalleryDLRunner:
         post_ids: Optional[List[str]] = None,
         post_id_field: str = "id",
         progress_callback: Optional[Callable[[str], None]] = None,
-        process_callback: Optional[Callable] = None
+        process_callback: Optional[Callable] = None,
+        rate_limit: str = "",
+        sleep_request: str = "",
+        download_retries: int = 4
     ) -> Dict[str, any]:
         """
         Run gallery-dl command
@@ -314,7 +328,10 @@ class GalleryDLRunner:
             folder_pattern=folder_pattern,
             file_pattern=file_pattern,
             post_ids=post_ids,
-            post_id_field=post_id_field
+            post_id_field=post_id_field,
+            rate_limit=rate_limit,
+            sleep_request=sleep_request,
+            download_retries=download_retries
         )
 
         try:
@@ -438,8 +455,7 @@ class GalleryDLRunner:
             url=url,
             platform=platform,
             simulate=True,
-            verbose=False,  # Less verbose for testing
-            skip_rate_limit=False  # RESPECT rate limits!
+            verbose=False  # Less verbose for testing
         )
         
         # Limit to just 1 post for testing (max ~5 files)

@@ -419,12 +419,24 @@ class DownloadQueueManager(QObject):
             # Store subprocess reference for pause/cancel
             def process_callback(process):
                 item.process = process
+                # Kill immediately if cancel was clicked before process started
+                if item.stop_flag or item.pause_flag:
+                    try:
+                        process.kill()
+                    except Exception:
+                        pass
 
             # App-level token replacements for naming patterns
             app_tokens = {
                 'creator_name': item.creator_display_name,
                 'creator_jp': item.creator_japanese_name,
             }
+
+            # Read platform-specific performance settings
+            platform_key = item.platform.lower()
+            rate_limit = self.db.get_setting(f"{platform_key}_rate_limit", "")
+            sleep_request = self.db.get_setting(f"{platform_key}_sleep_request", "0.5")
+            download_retries = int(self.db.get_setting(f"{platform_key}_retries", "4"))
 
             # Execute download via runner (handles cookies automatically)
             # verbose=True so raw gallery-dl output is captured for the Raw Output tab
@@ -458,7 +470,10 @@ class DownloadQueueManager(QObject):
                     post_ids=item.post_ids,
                     post_id_field=item.post_id_field,
                     progress_callback=output_callback,
-                    process_callback=process_callback
+                    process_callback=process_callback,
+                    rate_limit=rate_limit,
+                    sleep_request=sleep_request,
+                    download_retries=download_retries
                 )
 
                 if result["success"]:
@@ -672,10 +687,11 @@ class DownloadQueueManager(QObject):
             filename = os.path.basename(filepath)
             item.files_completed += 1
             item.current_file = filename
-            self.item_log.emit(item_id, f"  [{item.files_completed}] {filename}")
+            speed_str = f"  ({item.current_speed})" if item.current_speed else ""
+            self.item_log.emit(item_id, f"  [{item.files_completed}] {filename}{speed_str}")
 
         # Detect skipped files (already downloaded — counts toward progress on resume)
-        if "skipping" in line.lower() or ("already exists" in line.lower()):
+        elif "skipping" in line.lower() or ("already exists" in line.lower()):
             item.files_completed += 1
             self.item_log.emit(item_id, f"  [{item.files_completed}] (skipped - already exists)")
 
