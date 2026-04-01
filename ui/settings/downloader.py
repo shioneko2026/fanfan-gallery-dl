@@ -108,7 +108,6 @@ class DownloaderPage(QWidget):
         self.concurrent_spin.setMinimum(1)
         self.concurrent_spin.setMaximum(5)
         self.concurrent_spin.setValue(2)
-        self.concurrent_spin.setStyleSheet("padding: 5px;")
         queue_layout.addWidget(self.concurrent_spin)
 
         queue_layout.addSpacing(20)
@@ -185,8 +184,6 @@ class DownloaderPage(QWidget):
         sleep_spin.setDecimals(1)
         sleep_spin.setValue(PLATFORM_SLEEP_DEFAULTS.get(platform, 0.5))
         sleep_spin.setSuffix(" s")
-        sleep_spin.setStyleSheet("padding: 5px;")
-        sleep_spin.setFixedWidth(100)
         sleep_layout = QHBoxLayout()
         sleep_layout.addWidget(sleep_spin)
         sleep_layout.addWidget(QLabel("Sleep between requests"))
@@ -198,8 +195,6 @@ class DownloaderPage(QWidget):
         retries_spin.setMinimum(1)
         retries_spin.setMaximum(10)
         retries_spin.setValue(4)
-        retries_spin.setStyleSheet("padding: 5px;")
-        retries_spin.setFixedWidth(80)
         form.addRow("Retries:", retries_spin)
 
         self._platform_widgets[platform] = {
