@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo ============================================
 echo   FanFan Gallery-DL - Installing Dependencies
 echo ============================================

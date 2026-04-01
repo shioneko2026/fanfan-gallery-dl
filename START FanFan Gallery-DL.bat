@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo Starting FanFan Gallery-DL...
 echo.
 python main.py
