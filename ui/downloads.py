@@ -23,6 +23,7 @@ class DownloaderPage(QWidget):
 
         self.init_ui()
         self.queue_manager.item_status_changed.connect(self._on_item_status_changed)
+        self.queue_manager.item_completed.connect(self._on_download_completed)
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -83,9 +84,26 @@ class DownloaderPage(QWidget):
         """)
         self.scan_btn.clicked.connect(self.on_scan)
 
+        self.abort_scan_btn = QPushButton("Abort Scan")
+        self.abort_scan_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #c62828;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-family: 'Segoe UI';
+            }
+            QPushButton:hover { background-color: #b71c1c; }
+        """)
+        self.abort_scan_btn.setVisible(False)
+        self.abort_scan_btn.clicked.connect(self._abort_scan)
+
         url_layout.addWidget(url_label)
         url_layout.addWidget(self.url_input, 1)
         url_layout.addWidget(self.scan_btn)
+        url_layout.addWidget(self.abort_scan_btn)
 
         layout.addLayout(url_layout)
 
@@ -300,14 +318,15 @@ class DownloaderPage(QWidget):
         
         if main_window:
             main_window.clear_log()
-            main_window.log(f"Scanning {platform}...")
-            main_window.log(f"URL: {url}")
+            main_window.log(f"# Scanning {platform}...")
+            main_window.log(f"  URL: {url}")
             main_window.log("")
-        
-        # Disable scan and download buttons during scan
+
+        # Disable scan and download buttons during scan; show Abort Scan
         self.scan_btn.setEnabled(False)
         self.scan_btn.setText("Scanning...")
         self.download_btn.setEnabled(False)
+        self.abort_scan_btn.setVisible(True)
 
         # Track scan progress
         self._scan_item_count = 0
@@ -343,12 +362,46 @@ class DownloaderPage(QWidget):
             # Also show in Raw Output tab for debugging
             if main_window:
                 main_window.log_panel.append_raw(line)
-            # Update scan progress — count JSON entries that look like post metadata
-            if '"title"' in line or '"post_title"' in line:
+
+            # Parse JSON entry to show live post progress in App Log
+            # gallery-dl --dump-json outputs one entry per line: [type, ...metadata...]
+            stripped = line.strip().rstrip(',')
+            if stripped.startswith('[2,') or stripped.startswith('[3,'):
+                try:
+                    import json as _j
+                    entry = _j.loads(stripped)
+                    if entry[0] == 2:
+                        meta = entry[-1] if isinstance(entry[-1], dict) else {}
+                        title = (meta.get('post_title') or meta.get('title') or '').strip()
+                        date = str(meta.get('date', ''))[:10]
+                        self._scan_item_count += 1
+                        self.scan_btn.setText(f"Scanning... ({self._scan_item_count} posts)")
+                        label = f'"{title}"' if title else f"Post #{self._scan_item_count}"
+                        date_str = f" ({date})" if date and date != 'None' else ""
+                        if main_window:
+                            main_window.log(f"  [{self._scan_item_count}] {label}{date_str}")
+                except Exception:
+                    # Fallback: keyword heuristic for non-parseable lines
+                    if '"title"' in line or '"post_title"' in line:
+                        self._scan_item_count += 1
+                        self.scan_btn.setText(f"Scanning... ({self._scan_item_count} items)")
+            elif '"title"' in line or '"post_title"' in line:
+                # Compact single-line format — heuristic fallback
                 self._scan_item_count += 1
                 self.scan_btn.setText(f"Scanning... ({self._scan_item_count} items)")
         
         def on_finished(result):
+            self.abort_scan_btn.setVisible(False)
+
+            # Check if user aborted the scan
+            if getattr(self.scan_thread, '_aborted', False):
+                if main_window:
+                    main_window.log("")
+                    main_window.log("Scan aborted.")
+                self.scan_btn.setEnabled(True)
+                self.scan_btn.setText("Scan")
+                return
+
             if main_window:
                 main_window.log("")
                 main_window.log(f"Scan complete - Exit code: {result['exit_code']}")
@@ -666,6 +719,7 @@ class DownloaderPage(QWidget):
             self._play_beep()
 
         def on_error(error_msg):
+            self.abort_scan_btn.setVisible(False)
             if main_window:
                 main_window.log(f"Error: {error_msg}", is_error=True)
 
@@ -776,6 +830,16 @@ class DownloaderPage(QWidget):
         if status.lower() in terminal_statuses:
             if self.results_tree.topLevelItemCount() > 0:
                 self._update_selected_count()
+
+    def _on_download_completed(self, item_id: str):
+        """Play beep when the active download finishes"""
+        if item_id == self._current_item_id:
+            self._play_beep()
+
+    def _abort_scan(self):
+        """Kill the running scan process"""
+        if hasattr(self, 'scan_thread') and self.scan_thread.isRunning():
+            self.scan_thread.abort()
 
     def _populate_results_tree(self, posts, json_data):
         """Build the checklist tree from scan results"""

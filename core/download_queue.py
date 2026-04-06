@@ -712,9 +712,15 @@ class DownloadQueueManager(QObject):
             import re as re_mod
             post_match = re_mod.search(r'/posts/(\d+)', line)
             post_id = post_match.group(1) if post_match else ""
-            post_title = item.post_titles.get(post_id, "")
-            title_str = f" 「{post_title}」" if post_title else ""
-            self.item_log.emit(item_id, f"  ⚠ Locked content: Post {post_id}{title_str}")
+            # Suppress warning if this post wasn't in the user's selection —
+            # gallery-dl walks the whole profile to apply --filter, so it
+            # encounters (and warns about) locked posts the user didn't select
+            if item.post_ids and post_id and post_id not in item.post_ids:
+                pass
+            else:
+                post_title = item.post_titles.get(post_id, "")
+                title_str = f" 「{post_title}」" if post_title else ""
+                self.item_log.emit(item_id, f"  ⚠ Locked content: Post {post_id}{title_str}")
 
         # Parse download speed and ETA (if gallery-dl shows progress bars)
         speed_match = re.search(r'(\d+\.?\d*\s?[KMG]?B/s)', line)

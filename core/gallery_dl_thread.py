@@ -39,6 +39,8 @@ class GalleryDLThread(QThread):
         self.date_from = date_from
         self.date_to = date_to
         self.runner = GalleryDLRunner()
+        self._process = None
+        self._aborted = False
         
     def run(self):
         """Run gallery-dl in background thread"""
@@ -46,7 +48,11 @@ class GalleryDLThread(QThread):
             # Callback for output lines
             def output_callback(line: str):
                 self.output_line.emit(line)
-            
+
+            # Capture process reference so abort() can kill it
+            def process_callback(process):
+                self._process = process
+
             if self.test_mode:
                 # Test connection mode (no timeout - runs until complete)
                 result = self.runner.test_connection(
@@ -65,7 +71,8 @@ class GalleryDLThread(QThread):
                     dump_json=self.dump_json,
                     date_from=self.date_from,
                     date_to=self.date_to,
-                    progress_callback=output_callback
+                    progress_callback=output_callback,
+                    process_callback=process_callback
                 )
             
             # Emit finished signal with result
@@ -73,3 +80,12 @@ class GalleryDLThread(QThread):
             
         except Exception as e:
             self.error.emit(str(e))
+
+    def abort(self):
+        """Kill the running gallery-dl process and mark as aborted"""
+        self._aborted = True
+        if self._process:
+            try:
+                self._process.kill()
+            except Exception:
+                pass

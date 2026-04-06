@@ -133,7 +133,7 @@ class GalleryDLRunner:
             # Use patterns passed in (read on main thread), or fall back to defaults
             if not file_pattern:
                 file_pattern = "{filename}.{extension}"
-            if not folder_pattern:
+            if folder_pattern is None:
                 folder_pattern = "{category}/{creatorId}/{id} {title}"
 
             # Replace app-level tokens (resolved from artist DB) with literal values
