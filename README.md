@@ -69,15 +69,16 @@ This means:
 
 ---
 
-## Quick Start
+## How to Install
 
-1. Install [Python 3.9+](https://www.python.org/downloads/) — **check "Add to PATH"** during install
-2. Double-click **`Install Dependencies for FanFan Gallery-DL.bat`**
-3. Double-click **`START FanFan Gallery-DL.bat`**
+1. Go to the [Releases page](https://github.com/shioneko2026/fanfan-gallery-dl/releases) and download the latest `.zip` — then extract it anywhere
+2. Install [Python 3.9+](https://www.python.org/downloads/) — **on the first installer screen, check "Add Python to PATH"** or the app won't run
+3. Double-click **`Install Dependencies for FanFan Gallery-DL.bat`** — wait for the success message
+4. Double-click **`START FanFan Gallery-DL.bat`**
 
-Gallery-dl is auto-downloaded on first launch. No manual setup needed.
+Gallery-dl (the download engine) installs itself automatically on first launch.
 
-> See `How to Install and Run.txt` for a detailed walkthrough.
+> **First time?** Before downloading anything, go to **Settings → Credentials** and set up your cookies for each platform. The app walks you through it.
 
 ---
 
