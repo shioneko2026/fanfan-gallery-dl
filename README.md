@@ -82,6 +82,57 @@ Gallery-dl (the download engine) installs itself automatically on first launch.
 
 ---
 
+## How to Use
+
+### 1. Set up your cookies
+
+The app needs your browser cookies to access your subscriptions. Without them, it can only see free posts.
+
+Go to **Settings → Credentials**, pick a platform, and click **"How to get cookies"** — there's a step-by-step guide built in. Paste your cookies, save, then hit **Test Connection** to confirm it's working.
+
+> You'll need to redo this every few weeks as cookies expire.
+
+### 2. Add your creators (optional but recommended)
+
+Go to the **Creators** tab and click **+ Add Creator**. Fill in their display name, the platform URLs you want to download from, and a local folder to save to.
+
+Once added, hitting **Download** on a creator card takes you straight to the Downloader with everything pre-filled.
+
+![Creators](Screenshots/creators.jpg)
+
+### 3. Scan a creator
+
+Go to the **Downloader** tab. Either select a creator from the dropdown or paste their profile URL directly.
+
+Hit **Scan**. The App Log will show each post as it's found — title and date streaming in live. Depending on how many posts they have, this can take anywhere from a few seconds to a minute.
+
+![Downloader — scan results](Screenshots/downloader.jpg)
+
+Posts are color-coded:
+- **Green** — paid post, you have access
+- **Orange** — locked (subscriber-only tier you're not on)
+- **Black** — free post
+
+### 4. Select and download
+
+Check the posts you want. Use **Deselect image-only posts** to quickly clear posts with no video. Use the search box or date filters to narrow things down.
+
+When you're ready, hit **Download Selected**. One queue item is created — check the **Download Queue** tab to watch progress.
+
+![Download Queue](Screenshots/download-queue.jpg)
+
+### 5. Cross-Check (find what you're missing)
+
+Already have some files downloaded? Go to **Cross-Check**, paste the creator URL, point it at your local folder, and hit **Cross-Check**.
+
+It'll tell you exactly what's **Present**, what's **Missing**, and what's **Locked**. Hit **Download Missing** to grab only the gaps.
+
+![Cross-Check](Screenshots/cross-check.jpg)
+
+> Cross-Check requires files named with the Universal Standard pattern (the default). Files downloaded before using FanFan, or with custom naming, won't be matched.
+
+---
+
 ## Features
 
 ### Downloader
