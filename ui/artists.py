@@ -462,9 +462,21 @@ class ArtistsPage(QWidget):
         if hasattr(main_window, 'show_page'):
             main_window.show_page(1)  # Downloader page
             if hasattr(main_window, 'downloader_page'):
-                main_window.downloader_page.url_input.setText(url)
-                if local_folder:
-                    main_window.downloader_page.output_dir.setText(local_folder)
+                dp = main_window.downloader_page
+                # Try to select the matching creator in the dropdown
+                combo = dp.creator_combo
+                matched = False
+                for i in range(combo.count()):
+                    data = combo.itemData(i)
+                    if data and data.get('profile_url') == url:
+                        combo.setCurrentIndex(i)  # fires _on_creator_selected
+                        matched = True
+                        break
+                if not matched:
+                    # No combo entry — set URL and folder directly
+                    dp.url_input.setText(url)
+                    if local_folder:
+                        dp.output_dir.setText(local_folder)
 
     def on_crosscheck_artist(self, artist_id, platform_combo):
         """Navigate to cross-check page with the selected creator preloaded"""
