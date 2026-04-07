@@ -169,7 +169,7 @@ class Database:
         cursor = self.conn.cursor()
 
         us_folder = "{creator_name} {creator_jp} [{today}] [{category}]/{creator_name} {creator_jp} [{date:%Y-%m-%d}] {post_title} [P{post_id}] [{category}]"
-        us_file = "{creator_name} {creator_jp} [{date:%Y-%m-%d}] {post_title} {filename} [P{post_id}] [{category}].{extension}"
+        us_file = "{creator_name} {creator_jp} [{date:%Y-%m-%d}] {post_title} - {filename} [P{post_id}] [{category}].{extension}"
 
         existing = cursor.execute(
             "SELECT id, folder_pattern FROM naming_presets WHERE is_default = 1"
@@ -188,11 +188,13 @@ class Database:
                 (us_folder, us_file, existing[0])
             )
         elif existing:
-            # Migrate to add {post_title} if missing from file pattern
+            # Migrate file pattern: add {post_title} if missing, or add the ' - '
+            # separator between {post_title} and {filename} if not already present
             cur_file = cursor.execute(
                 "SELECT file_pattern FROM naming_presets WHERE is_default = 1"
             ).fetchone()
-            if cur_file and "{post_title}" not in (cur_file[0] or ""):
+            cur = cur_file[0] or "" if cur_file else ""
+            if "{post_title}" not in cur or "{post_title} - {filename}" not in cur:
                 cursor.execute(
                     "UPDATE naming_presets SET file_pattern = ? WHERE id = ?",
                     (us_file, existing[0])

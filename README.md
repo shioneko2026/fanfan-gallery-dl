@@ -47,7 +47,7 @@ The killer feature. Scan a creator, point to your local folder, and instantly se
 Every file gets a consistent, predictable name:
 
 ```
-Creator JP-Name [2026-01-15] Post Title filename [P12345678] [Fanbox].mp4
+Whitefish しろサカナ [2026-02-24] Ocean Series - Herring 01 [P11458849] [Fanbox].mp4
 ```
 
 This means:
@@ -100,7 +100,7 @@ Gallery-dl is auto-downloaded on first launch. No manual setup needed.
 - Abort any download mid-way; re-download from the same scan without rescanning
 - App Log shows filenames and download speed as files complete
 - Beep notification when scan or download finishes
-- ZIP auto-extraction with Universal Standard naming applied to extracted files
+- ZIP auto-extraction with Universal Standard naming applied to extracted files *(experimental — not fully tested)*
 
 ![Download Queue](Screenshots/download-queue.jpg)
 
@@ -137,6 +137,7 @@ Gallery-dl is auto-downloaded on first launch. No manual setup needed.
 | **No file sizes before download** | Scan mode returns filenames and metadata but not sizes. |
 | **Downloads are slow by default — intentional** | Gallery-dl enforces sleep delays between requests to avoid rate-limiting. Default is 1.0s between files on Fanbox/Fantia. A post with 50 files takes ~50s minimum. Adjustable in Settings → Downloader, at your own risk. |
 | **Downloader settings are untested** | Per-platform rate/sleep/retry controls are new and haven't been extensively tested in practice. Use defaults until you're confident. |
+| **ZIP extraction is experimental** | Archives are auto-extracted after download, but this feature is not fully tested. Extraction may fail silently or produce unexpected results — check the App Log. |
 | **Verification count may include locked posts** | The post-download verification count reflects all posts gallery-dl scanned, which may include locked posts that were skipped. This is a known issue. |
 | **Windows only** | Uses Windows Credential Manager for cookie storage and `winsound` for notifications. |
 
@@ -146,7 +147,7 @@ Gallery-dl is auto-downloaded on first launch. No manual setup needed.
 
 This is not just a naming convention. It's a system.
 
-When your files are named `Whitefish しろサカナ [2026-02-24] PostTitle filename [P11458849] [Fanbox].mp4`, you get:
+When your files are named `Whitefish しろサカナ [2026-02-24] Ocean Series - Herring 01 [P11458849] [Fanbox].mp4`, you get:
 
 1. **Self-describing files** — move them anywhere, they still tell you everything
 2. **Chronological sorting** — your OS sorts by date automatically
