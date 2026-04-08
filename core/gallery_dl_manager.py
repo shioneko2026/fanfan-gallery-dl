@@ -14,12 +14,13 @@ import requests
 class GalleryDLManager:
     """Manages gallery-dl binary and execution"""
 
-    def __init__(self, bin_dir: Optional[Path] = None):
+    def __init__(self, bin_dir: Optional[Path] = None, source: str = "codeberg"):
         """
         Initialize the manager
 
         Args:
             bin_dir: Directory to store gallery-dl binary (defaults to project bin/)
+            source: Download source — "codeberg" (full version) or "github" (lite version)
         """
         if bin_dir is None:
             bin_dir = Path(__file__).parent.parent / "bin"
@@ -30,7 +31,14 @@ class GalleryDLManager:
         self.binary_path = self.bin_dir / "gallery-dl.exe"
         self.backup_path = self.bin_dir / "gallery-dl-prev.exe"
 
-        self.github_api_url = "https://api.github.com/repos/mikf/gallery-dl/releases/latest"
+        self.source = source
+        if source == "github":
+            self.api_url = "https://api.github.com/repos/mikf/gallery-dl/releases/latest"
+            self.changelog_base_url = "https://github.com/mikf/gallery-dl/releases"
+        else:
+            self.api_url = "https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases?limit=1"
+            self.changelog_base_url = "https://codeberg.org/mikf/gallery-dl/releases"
+
         self.current_version = None
 
     def ensure_binary(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:
@@ -64,13 +72,16 @@ class GalleryDLManager:
             True if successful, False otherwise
         """
         try:
-            # Get latest release info from GitHub API
+            # Get latest release info
+            source_label = "Codeberg" if self.source == "codeberg" else "GitHub"
             if progress_callback:
-                progress_callback("Fetching latest release info from GitHub...")
+                progress_callback(f"Fetching latest release info from {source_label}...")
 
-            response = requests.get(self.github_api_url, timeout=10)
+            response = requests.get(self.api_url, timeout=10)
             response.raise_for_status()
-            release_data = response.json()
+            raw = response.json()
+            # Codeberg returns a list; GitHub returns a dict
+            release_data = raw[0] if isinstance(raw, list) else raw
 
             # Find the .exe asset
             exe_asset = None
@@ -162,18 +173,20 @@ class GalleryDLManager:
             if not current:
                 return None
 
-            # Get latest release from GitHub
-            response = requests.get(self.github_api_url, timeout=10)
+            # Get latest release
+            response = requests.get(self.api_url, timeout=10)
             response.raise_for_status()
-            release_data = response.json()
+            raw = response.json()
+            release_data = raw[0] if isinstance(raw, list) else raw
 
             latest = release_data.get("tag_name", "").lstrip('v')
+            changelog_url = release_data.get("html_url", "") or self.changelog_base_url
 
             return {
                 "current": current,
                 "latest": latest,
                 "update_available": self._compare_versions(current, latest) < 0,
-                "changelog_url": release_data.get("html_url", "")
+                "changelog_url": changelog_url
             }
 
         except Exception as e:

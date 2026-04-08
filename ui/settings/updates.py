@@ -2,7 +2,8 @@
 Settings - Updates management
 """
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                            QPushButton, QGroupBox, QCheckBox, QMessageBox)
+                            QPushButton, QGroupBox, QCheckBox, QMessageBox,
+                            QComboBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from core.gallery_dl_manager import GalleryDLManager
 from datetime import datetime
@@ -28,7 +29,8 @@ class UpdatesPage(QWidget):
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.db = db
-        self.manager = GalleryDLManager()
+        source = self.db.get_setting("gallery_dl_source", "codeberg")
+        self.manager = GalleryDLManager(source=source)
         self.update_thread = None
         self.init_ui()
 
@@ -48,6 +50,47 @@ class UpdatesPage(QWidget):
             }
         """)
         layout.addWidget(title)
+
+        # gallery-dl source selector
+        source_group = QGroupBox("Download Source")
+        source_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 15px;
+                background-color: white;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
+
+        source_layout = QVBoxLayout()
+
+        source_row = QHBoxLayout()
+        source_row.addWidget(QLabel("Download gallery-dl from:"))
+        self.source_combo = QComboBox()
+        self.source_combo.addItem("Codeberg (full version — recommended)", "codeberg")
+        self.source_combo.addItem("GitHub (lite version)", "github")
+        self.source_combo.currentIndexChanged.connect(self._on_source_changed)
+        source_row.addWidget(self.source_combo)
+        source_row.addStretch()
+        source_layout.addLayout(source_row)
+
+        source_note = QLabel(
+            "The gallery-dl author moved the full version to Codeberg. "
+            "The GitHub version is becoming a lite build. Codeberg is recommended."
+        )
+        source_note.setStyleSheet("color: #666; font-size: 12px;")
+        source_note.setWordWrap(True)
+        source_layout.addWidget(source_note)
+
+        source_group.setLayout(source_layout)
+        layout.addWidget(source_group)
 
         # gallery-dl updates
         gdl_group = QGroupBox("gallery-dl Updates")
@@ -184,8 +227,22 @@ class UpdatesPage(QWidget):
         auto_notify = self.db.get_setting("auto_notify_updates", "true") == "true"
         self.auto_notify_check.setChecked(auto_notify)
 
+        # Set source selector
+        source = self.db.get_setting("gallery_dl_source", "codeberg")
+        idx = self.source_combo.findData(source)
+        if idx >= 0:
+            self.source_combo.blockSignals(True)
+            self.source_combo.setCurrentIndex(idx)
+            self.source_combo.blockSignals(False)
+
         # Load gallery-dl version
         self.refresh_version_info()
+
+    def _on_source_changed(self):
+        """Save source preference and recreate manager with new source"""
+        source = self.source_combo.currentData()
+        self.db.set_setting("gallery_dl_source", source)
+        self.manager = GalleryDLManager(source=source)
 
     def refresh_version_info(self):
         """Refresh gallery-dl version information"""
@@ -314,7 +371,7 @@ class UpdatesPage(QWidget):
         if self.changelog_url:
             webbrowser.open(self.changelog_url)
         else:
-            webbrowser.open("https://github.com/mikf/gallery-dl/releases")
+            webbrowser.open(self.manager.changelog_base_url)
 
     def showEvent(self, event):
         """Refresh version info when page is shown"""

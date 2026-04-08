@@ -153,7 +153,8 @@ class Database:
             "fantia_rate_limit": "", "fantia_sleep_request": "1.0", "fantia_retries": "4",
             "pixiv_rate_limit": "", "pixiv_sleep_request": "0.5", "pixiv_retries": "4",
             "patreon_rate_limit": "", "patreon_sleep_request": "0.5", "patreon_retries": "4",
-            "subscribestar_rate_limit": "", "subscribestar_sleep_request": "0.5", "subscribestar_retries": "4"
+            "subscribestar_rate_limit": "", "subscribestar_sleep_request": "0.5", "subscribestar_retries": "4",
+            "gallery_dl_source": "codeberg"
         }
 
         cursor = self.conn.cursor()
