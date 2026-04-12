@@ -23,7 +23,7 @@ echo Python found!
 echo.
 echo Installing required packages...
 echo.
-pip install PyQt6 requests pykakasi keyring send2trash
+pip install -r requirements.txt
 echo.
 if errorlevel 1 (
     echo ============================================
