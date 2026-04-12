@@ -4,7 +4,7 @@ Main application window with sidebar navigation
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QPushButton, QStackedWidget, QScrollArea, QLabel,
                             QFrame, QTextEdit, QSplitter, QDockWidget)
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QIcon, QTextCursor
 
 from db.database import Database
@@ -73,11 +73,21 @@ class MainWindow(QMainWindow):
         self.sidebar = self.create_sidebar()
         main_layout.addWidget(self.sidebar)
 
+        # Right-side container (banner + content + log)
+        right_container = QWidget()
+        right_vbox = QVBoxLayout(right_container)
+        right_vbox.setContentsMargins(0, 0, 0, 0)
+        right_vbox.setSpacing(0)
+
+        # Update banner (hidden by default)
+        self.update_banner = self._create_update_banner()
+        right_vbox.addWidget(self.update_banner)
+
         # Content area with log panel
         content_and_log = QHBoxLayout()
         content_and_log.setContentsMargins(0, 0, 0, 0)
         content_and_log.setSpacing(0)
-        
+
         # Content stack
         self.content_stack = QStackedWidget()
         content_and_log.addWidget(self.content_stack, 1)
@@ -88,11 +98,12 @@ class MainWindow(QMainWindow):
         self.log_panel.setMinimumWidth(400)
         self.log_panel.setMaximumWidth(600)
         content_and_log.addWidget(self.log_panel, 0)
-        
-        # Add to main layout
+
         content_widget = QWidget()
         content_widget.setLayout(content_and_log)
-        main_layout.addWidget(content_widget, 1)
+        right_vbox.addWidget(content_widget, 1)
+
+        main_layout.addWidget(right_container, 1)
 
         # Add pages
         self.add_pages()
@@ -402,6 +413,137 @@ class MainWindow(QMainWindow):
     def clear_log(self):
         """Clear log panel"""
         self.log_panel.clear_log()
+
+    # ── Update banner ──────────────────────────────────────────────────
+
+    def _create_update_banner(self) -> QFrame:
+        """Create the slim update notification banner (hidden by default)."""
+        banner = QFrame()
+        banner.setVisible(False)
+        banner.setStyleSheet("""
+            QFrame {
+                background-color: #1565c0;
+                border-bottom: 1px solid #0d47a1;
+            }
+        """)
+        banner.setFixedHeight(38)
+
+        layout = QHBoxLayout(banner)
+        layout.setContentsMargins(16, 0, 8, 0)
+        layout.setSpacing(12)
+
+        self._banner_label = QLabel("")
+        self._banner_label.setStyleSheet("color: white; font-size: 13px;")
+        layout.addWidget(self._banner_label)
+        layout.addStretch()
+
+        self._banner_action_btn = QPushButton("Update Now")
+        self._banner_action_btn.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                color: #1565c0;
+                border: none;
+                padding: 4px 14px;
+                border-radius: 3px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #e3f2fd; }
+        """)
+        self._banner_action_btn.clicked.connect(self._on_banner_action)
+        layout.addWidget(self._banner_action_btn)
+
+        dismiss_btn = QPushButton("✕")
+        dismiss_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: rgba(255,255,255,0.7);
+                border: none;
+                font-size: 14px;
+                padding: 2px 6px;
+            }
+            QPushButton:hover { color: white; }
+        """)
+        dismiss_btn.clicked.connect(self.hide_update_banner)
+        layout.addWidget(dismiss_btn)
+
+        return banner
+
+    def show_update_banner(self, version: str, download_ready: bool = False):
+        """Show update notification banner."""
+        if download_ready:
+            self._banner_label.setText(f"FanFan Gallery-DL v{version} downloaded — restart to apply.")
+            self._banner_action_btn.setText("Restart Now")
+            self._banner_action_btn.setProperty("mode", "restart")
+        else:
+            self._banner_label.setText(f"FanFan Gallery-DL v{version} is available.")
+            self._banner_action_btn.setText("Update Now")
+            self._banner_action_btn.setProperty("mode", "update")
+        self.update_banner.setVisible(True)
+
+    def hide_update_banner(self):
+        self.update_banner.setVisible(False)
+
+    def _on_banner_action(self):
+        mode = self._banner_action_btn.property("mode")
+        if mode == "restart":
+            from core.app_updater import AppUpdater
+            AppUpdater().apply_update()
+        else:
+            # Navigate to Updates settings page
+            self.show_page(9)
+
+    # ── Startup update check ───────────────────────────────────────────
+
+    def run_startup_update_check(self):
+        """Run app update check in background after window is shown."""
+        if self.db.get_setting("auto_check_app_updates", "true") != "true":
+            return
+        from core.app_updater import AppUpdater
+        from PyQt6.QtCore import QThread
+        from PyQt6.QtCore import pyqtSignal as Signal
+
+        class _CheckThread(QThread):
+            done = Signal(dict)
+            def __init__(self, updater):
+                super().__init__()
+                self.updater = updater
+            def run(self):
+                result = self.updater.check_for_updates()
+                self.done.emit(result or {})
+
+        self._startup_updater = AppUpdater()
+        self._startup_check_thread = _CheckThread(self._startup_updater)
+        self._startup_check_thread.done.connect(self._on_startup_check_done)
+        self._startup_check_thread.start()
+
+    def _on_startup_check_done(self, result: dict):
+        if not result.get("update_available"):
+            return
+        version = result.get("latest", "")
+        auto_update = self.db.get_setting("auto_update_app", "false") == "true"
+        if auto_update and self._startup_updater.is_frozen():
+            # Download silently then update banner
+            from PyQt6.QtCore import QThread
+            from PyQt6.QtCore import pyqtSignal as Signal
+
+            class _DownloadThread(QThread):
+                done = Signal(bool)
+                def __init__(self, updater):
+                    super().__init__()
+                    self.updater = updater
+                def run(self):
+                    self.done.emit(self.updater.download_update())
+
+            self._startup_dl_thread = _DownloadThread(self._startup_updater)
+            self._startup_dl_thread.done.connect(
+                lambda ok: self.show_update_banner(version, download_ready=ok)
+            )
+            self._startup_dl_thread.start()
+        else:
+            self.show_update_banner(version, download_ready=False)
+
+    # ── Lifecycle ──────────────────────────────────────────────────────
 
     def closeEvent(self, event):
         """Clean up before closing"""

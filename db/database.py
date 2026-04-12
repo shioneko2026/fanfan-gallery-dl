@@ -10,7 +10,8 @@ from pathlib import Path
 class Database:
     def __init__(self, db_path=None):
         if db_path is None:
-            db_path = Path(__file__).parent.parent / "Credentials and User Data" / "appdata.db"
+            from core.paths import get_data_dir
+            db_path = get_data_dir() / "Credentials and User Data" / "appdata.db"
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,7 +155,9 @@ class Database:
             "pixiv_rate_limit": "", "pixiv_sleep_request": "0.5", "pixiv_retries": "4",
             "patreon_rate_limit": "", "patreon_sleep_request": "0.5", "patreon_retries": "4",
             "subscribestar_rate_limit": "", "subscribestar_sleep_request": "0.5", "subscribestar_retries": "4",
-            "gallery_dl_source": "codeberg"
+            "gallery_dl_source": "codeberg",
+            "auto_check_app_updates": "true",
+            "auto_update_app": "false",
         }
 
         cursor = self.conn.cursor()

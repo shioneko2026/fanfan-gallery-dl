@@ -778,7 +778,8 @@ class NamingPage(QWidget):
 
     def _show_preset_info(self):
         """Show Universal Standard info dialog from MD file"""
-        md_path = Path(__file__).parent.parent.parent / "config" / "universal_standard_info.md"
+        from core.paths import get_resource
+        md_path = get_resource("config/universal_standard_info.md")
 
         content = "Universal Standard naming preset information.\n\n(Content coming soon)"
         if md_path.exists():

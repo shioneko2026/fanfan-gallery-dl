@@ -5,7 +5,7 @@ Main entry point
 import sys
 import traceback
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from ui.main_window import MainWindow
 
 
@@ -22,6 +22,9 @@ def main():
 
         window = MainWindow()
         window.show()
+
+        # Startup update check — 2s delay so window renders first
+        QTimer.singleShot(2000, window.run_startup_update_check)
 
         sys.exit(app.exec())
 

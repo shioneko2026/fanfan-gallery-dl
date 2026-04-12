@@ -20,7 +20,8 @@ class GalleryDLRunner:
             gallery_dl_path: Path to gallery-dl executable (default: bin/gallery-dl.exe)
         """
         if gallery_dl_path is None:
-            gallery_dl_path = Path(__file__).parent.parent / "bin" / "gallery-dl.exe"
+            from core.paths import get_data_dir
+            gallery_dl_path = get_data_dir() / "bin" / "gallery-dl.exe"
 
         self.gallery_dl_path = gallery_dl_path
         self.cred_manager = CredentialManager()

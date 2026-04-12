@@ -23,7 +23,8 @@ class GalleryDLManager:
             source: Download source — "codeberg" (full version) or "github" (lite version)
         """
         if bin_dir is None:
-            bin_dir = Path(__file__).parent.parent / "bin"
+            from core.paths import get_data_dir
+            bin_dir = get_data_dir() / "bin"
 
         self.bin_dir = Path(bin_dir)
         self.bin_dir.mkdir(parents=True, exist_ok=True)
