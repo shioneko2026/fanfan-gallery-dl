@@ -64,8 +64,6 @@ This means:
 |----------|--------|
 | Pixiv Fanbox | ✓ Tested |
 | Fantia | ✓ Tested |
-| Patreon | Planned |
-| SubscribeStar | Planned |
 
 ---
 
@@ -102,8 +100,6 @@ The app needs your browser cookies to access your subscriptions. Cookies are sma
 4. **Find the right cookie** — scroll through the list and look for:
    - **Fanbox:** `FANBOXSESSID`
    - **Fantia:** `_session_id`
-   - **Patreon:** `session_id`
-   - **SubscribeStar:** `_subscribestar_session`
 
 5. **Copy the value** — click the cookie name to expand it, then copy the **Value** field (the long string of letters and numbers)
 
