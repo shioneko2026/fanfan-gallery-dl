@@ -86,11 +86,35 @@ Gallery-dl (the download engine) installs itself automatically on first launch.
 
 ### 1. Set up your cookies
 
-The app needs your browser cookies to access your subscriptions. Without them, it can only see free posts.
+The app needs your browser cookies to access your subscriptions. Cookies are small pieces of data your browser stores when you log into a website — they prove you're logged in. FanFan uses these to download content you've paid for. Without them, it can only see free posts.
 
-Go to **Settings → Credentials**, pick a platform, and click **"How to get cookies"** — there's a step-by-step guide built in. Paste your cookies, save, then hit **Test Connection** to confirm it's working.
+#### How to get your cookies
 
-> You'll need to redo this every few weeks as cookies expire.
+1. **Install Cookie-Editor** — a free browser extension
+   - [Chrome / Edge / Brave / Vivaldi](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
+   - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
+   - Or visit [cookie-editor.com](https://cookie-editor.com/) and click Install
+
+2. **Log into your platform** — go to Fanbox, Fantia, etc. in your browser and make sure you're signed in with an active subscription
+
+3. **Open Cookie-Editor** — click the cookie icon in your browser toolbar while on the platform's website
+
+4. **Find the right cookie** — scroll through the list and look for:
+   - **Fanbox:** `FANBOXSESSID`
+   - **Fantia:** `_session_id`
+   - **Patreon:** `session_id`
+   - **SubscribeStar:** `_subscribestar_session`
+
+5. **Copy the value** — click the cookie name to expand it, then copy the **Value** field (the long string of letters and numbers)
+
+   ![Cookie-Editor showing FANBOXSESSID](Screenshots/cookie-editor.jpg)
+   *Cookie-Editor showing the FANBOXSESSID cookie. Screenshot via [Cookie-Editor](https://cookie-editor.com/) by cgagnier.*
+
+6. **Paste into FanFan** — open the app, go to **Settings → Credentials**, select the platform tab, paste the value into the cookie field, and click **Save Cookies**
+
+7. **Test it** — click **Test Connection** and pick any creator you're subscribed to. If it says "Connection successful," you're good to go.
+
+> **Cookies expire every few weeks.** When downloads start failing with auth errors, just repeat steps 2–6 to refresh them. The app will tell you when cookies are expired (v0.10.0+).
 
 ### 2. Add your creators (optional but recommended)
 

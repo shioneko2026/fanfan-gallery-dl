@@ -116,7 +116,26 @@ class DownloaderPage(QWidget):
         queue_layout.addWidget(hint)
         queue_layout.addStretch()
 
-        queue_group.setLayout(queue_layout)
+        # Skip-abort threshold for incremental downloads
+        skip_layout = QHBoxLayout()
+        skip_layout.addWidget(QLabel("Early stop after"))
+        self.skip_abort_spin = QSpinBox()
+        self.skip_abort_spin.setMinimum(0)
+        self.skip_abort_spin.setMaximum(100)
+        self.skip_abort_spin.setValue(0)
+        self.skip_abort_spin.setSpecialValueText("Disabled")
+        skip_layout.addWidget(self.skip_abort_spin)
+        skip_layout.addWidget(QLabel("consecutive skips"))
+        skip_layout.addSpacing(20)
+        skip_hint = QLabel("Stop downloading a creator after N already-existing files in a row. Great for incremental updates. 0 = disabled.")
+        skip_hint.setWordWrap(True)
+        skip_hint.setStyleSheet("color: #888; font-weight: normal;")
+        skip_layout.addWidget(skip_hint, 1)
+
+        queue_inner = QVBoxLayout()
+        queue_inner.addLayout(queue_layout)
+        queue_inner.addLayout(skip_layout)
+        queue_group.setLayout(queue_inner)
         layout.addWidget(queue_group)
 
         # --- Per-Platform Performance ---
@@ -214,6 +233,7 @@ class DownloaderPage(QWidget):
     def load_settings(self):
         self.folder_input.setText(self.db.get_setting("default_save_folder", ""))
         self.concurrent_spin.setValue(int(self.db.get_setting("concurrent_downloads", "2")))
+        self.skip_abort_spin.setValue(int(self.db.get_setting("skip_abort_threshold", "0")))
 
         for platform in PLATFORMS:
             w = self._platform_widgets[platform]
@@ -234,6 +254,7 @@ class DownloaderPage(QWidget):
         self.db.set_setting("default_save_folder", self.folder_input.text())
         concurrent = self.concurrent_spin.value()
         self.db.set_setting("concurrent_downloads", str(concurrent))
+        self.db.set_setting("skip_abort_threshold", str(self.skip_abort_spin.value()))
 
         # Propagate concurrent downloads to active queue manager
         main_window = self.window()

@@ -844,10 +844,12 @@ class DownloaderPage(QWidget):
     def _populate_results_tree(self, posts, json_data):
         """Build the checklist tree from scan results"""
         self.results_tree.blockSignals(True)
+        self.results_tree.setUpdatesEnabled(False)
         self.results_tree.clear()
 
         self._scan_posts = posts
 
+        _batch_items = []
         for post_id, post in posts.items():
             # Post row
             title_str = post['title'] if post['title'] else 'Untitled'
@@ -975,7 +977,9 @@ class DownloaderPage(QWidget):
                 child.setToolTip(0, f)
                 child.setText(3, "FILE")
 
-            self.results_tree.addTopLevelItem(post_item)
+            _batch_items.append(post_item)
+        self.results_tree.addTopLevelItems(_batch_items)
+        self.results_tree.setUpdatesEnabled(True)
         self.results_tree.blockSignals(False)
 
         # Show controls
@@ -1168,16 +1172,13 @@ class DownloaderPage(QWidget):
         self.creator_combo.addItem("— Select a creator —", None)
 
         try:
-            creators = list(self.db.get_all_creators())
-            for a in creators:
-                a_dict = dict(a)
-                platforms = self.db.get_creator_platforms(a_dict['id'])
-                for p in platforms:
-                    p_dict = dict(p)
-                    label = f"{a_dict['display_name']} ({p_dict['platform'].title()})"
+            creators = self.db.get_all_creators_with_platforms()
+            for creator in creators:
+                for p in creator['platform_entries']:
+                    label = f"{creator['display_name']} ({p['platform'].title()})"
                     self.creator_combo.addItem(label, {
-                        'profile_url': p_dict.get('profile_url', ''),
-                        'local_folder': p_dict.get('local_folder', ''),
+                        'profile_url': p.get('profile_url', ''),
+                        'local_folder': p.get('local_folder', ''),
                     })
         except Exception:
             pass
@@ -1288,10 +1289,9 @@ class DownloaderPage(QWidget):
             return
 
         # Search all creator platforms for a matching URL
-        creators = list(self.db.get_all_creators())
+        creators = self.db.get_all_creators_with_platforms()
         for creator in creators:
-            platforms = self.db.get_creator_platforms(creator['id'])
-            for p in platforms:
+            for p in creator['platform_entries']:
                 if p['profile_url'] and p['profile_url'].strip() in url:
                     folder = p['local_folder'] or ''
                     if folder:

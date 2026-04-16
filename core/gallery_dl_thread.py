@@ -82,10 +82,14 @@ class GalleryDLThread(QThread):
             self.error.emit(str(e))
 
     def abort(self):
-        """Kill the running gallery-dl process and mark as aborted"""
+        """Stop the running gallery-dl process and mark as aborted"""
         self._aborted = True
         if self._process:
             try:
-                self._process.kill()
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=3)
+                except Exception:
+                    self._process.kill()
             except Exception:
                 pass

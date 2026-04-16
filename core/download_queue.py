@@ -14,6 +14,20 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from core.zip_extractor import ZipExtractor
 
 
+def _graceful_kill(process):
+    """Terminate a subprocess gracefully: terminate first, kill if it doesn't stop."""
+    if process is None:
+        return
+    try:
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except Exception:
+            process.kill()
+    except Exception:
+        pass
+
+
 @dataclass
 class DownloadError:
     """Individual download error"""
@@ -117,23 +131,23 @@ class DownloadQueueManager(QObject):
         'SubscribeStar': 2,
     }
 
-    def __init__(self, gallery_dl_manager, db, max_concurrent=2):
+    def __init__(self, db, max_concurrent=2, runner=None):
         """
         Initialize download queue manager
 
         Args:
-            gallery_dl_manager: GalleryDLManager instance
             db: Database instance
             max_concurrent: Maximum concurrent downloads (global limit, overridden by platform limits)
+            runner: Optional GalleryDLRunner instance (created automatically if not provided)
         """
         super().__init__()
-        self.manager = gallery_dl_manager
         self.db = db
         self.max_concurrent = max_concurrent
 
-        # Use GalleryDLRunner for actual downloads (handles cookies)
-        from core.gallery_dl_runner import GalleryDLRunner
-        self.runner = GalleryDLRunner()
+        if runner is None:
+            from core.gallery_dl_runner import GalleryDLRunner
+            runner = GalleryDLRunner()
+        self.runner = runner
 
         self.items: Dict[str, DownloadItem] = {}
         self.queue = Queue()
@@ -348,7 +362,7 @@ class DownloadQueueManager(QObject):
             # Get next item (non-blocking peek)
             try:
                 item_id = self.queue.get(timeout=1)
-            except:
+            except Exception:
                 continue
 
             with self.queue_lock:
@@ -403,12 +417,8 @@ class DownloadQueueManager(QObject):
             # Prepare output callback — streams to both parser and log panel
             def output_callback(line: str):
                 if item.stop_flag or item.pause_flag:
-                    # Kill the subprocess when pause/cancel is requested
-                    if item.process:
-                        try:
-                            item.process.kill()  # kill() is more reliable than terminate() on Windows
-                        except Exception:
-                            pass
+                    # Stop the subprocess when pause/cancel is requested
+                    _graceful_kill(item.process)
                     return
 
                 # Stream raw output to log panel
@@ -419,12 +429,9 @@ class DownloadQueueManager(QObject):
             # Store subprocess reference for pause/cancel
             def process_callback(process):
                 item.process = process
-                # Kill immediately if cancel was clicked before process started
+                # Stop immediately if cancel was clicked before process started
                 if item.stop_flag or item.pause_flag:
-                    try:
-                        process.kill()
-                    except Exception:
-                        pass
+                    _graceful_kill(process)
 
             # App-level token replacements for naming patterns
             app_tokens = {
@@ -437,6 +444,7 @@ class DownloadQueueManager(QObject):
             rate_limit = self.db.get_setting(f"{platform_key}_rate_limit", "")
             sleep_request = self.db.get_setting(f"{platform_key}_sleep_request", "0.5")
             download_retries = int(self.db.get_setting(f"{platform_key}_retries", "4"))
+            skip_abort_threshold = int(self.db.get_setting("skip_abort_threshold", "0"))
 
             # Execute download via runner (handles cookies automatically)
             # verbose=True so raw gallery-dl output is captured for the Raw Output tab
@@ -473,7 +481,8 @@ class DownloadQueueManager(QObject):
                     process_callback=process_callback,
                     rate_limit=rate_limit,
                     sleep_request=sleep_request,
-                    download_retries=download_retries
+                    download_retries=download_retries,
+                    skip_abort_threshold=skip_abort_threshold
                 )
 
                 if result["success"]:
@@ -592,6 +601,10 @@ class DownloadQueueManager(QObject):
                         self.item_log.emit(item_id, f"  VERIFICATION: {item.files_completed}/{item.expected_files} files — {missing} missing")
                         self.item_log.emit(item_id, f"  Check locked/subscriber-only posts or retry")
 
+                # Show actionable exit code diagnostics if non-zero
+                for level, msg in result.get("exit_messages", []):
+                    self.item_log.emit(item_id, f"  → {msg}")
+
                 # Failure report with post titles
                 if item.errors:
                     self.item_log.emit(item_id, "")
@@ -638,6 +651,10 @@ class DownloadQueueManager(QObject):
                 self.item_log.emit(item_id, "")
                 self.item_log.emit(item_id, f"✗ DOWNLOAD FAILED: {error_msg}")
 
+                # Show actionable exit code diagnostics
+                for level, msg in result.get("exit_messages", []):
+                    self.item_log.emit(item_id, f"  → {msg}")
+
                 self.item_failed.emit(item_id, item.error_message)
                 self._save_failed(item)
 
@@ -665,35 +682,43 @@ class DownloadQueueManager(QObject):
         """Parse gallery-dl output for progress information"""
         item = self.items[item_id]
 
-        # gallery-dl verbose output patterns:
-        # Full file path (no prefix, starts with drive letter) = file saved
-        # "# filename.ext" = file being listed (simulate mode)
-        # "[debug]" lines = internal debug info (skip)
-
         # Skip debug/info lines — they're not file downloads
         if "[debug]" in line or "[info]" in line:
             return
 
-        # Detect saved file — gallery-dl outputs the full file path when a file is saved
-        # e.g.: "H:\folder\file.jpg" or "C:\Users\...\file.mp4"
-        is_file_path = (
-            (len(line) > 3 and line[1] == ':' and line[2] == '\\') or  # Windows: C:\...
-            line.startswith('/')  # Unix: /home/...
-        )
-
-        if is_file_path:
+        # --- Structured --print output (preferred, unambiguous) ---
+        if line.startswith("[DOWNLOADED]"):
             import os
-            filepath = line.strip()
+            filepath = line[12:].strip()  # len("[DOWNLOADED]") == 12
             filename = os.path.basename(filepath)
             item.files_completed += 1
             item.current_file = filename
             speed_str = f"  ({item.current_speed})" if item.current_speed else ""
             self.item_log.emit(item_id, f"  [{item.files_completed}] {filename}{speed_str}")
-
-        # Detect skipped files (already downloaded — counts toward progress on resume)
-        elif "skipping" in line.lower() or ("already exists" in line.lower()):
+        elif line.startswith("[SKIPPED]"):
             item.files_completed += 1
             self.item_log.emit(item_id, f"  [{item.files_completed}] (skipped - already exists)")
+
+        # --- Fallback: legacy heuristic parsing for older gallery-dl versions ---
+        else:
+            # Detect saved file — gallery-dl outputs the full file path when a file is saved
+            is_file_path = (
+                (len(line) > 3 and line[1] == ':' and line[2] == '\\') or  # Windows: C:\...
+                line.startswith('/')  # Unix: /home/...
+            )
+
+            if is_file_path:
+                import os
+                filepath = line.strip()
+                filename = os.path.basename(filepath)
+                item.files_completed += 1
+                item.current_file = filename
+                speed_str = f"  ({item.current_speed})" if item.current_speed else ""
+                self.item_log.emit(item_id, f"  [{item.files_completed}] {filename}{speed_str}")
+
+            elif "skipping" in line.lower() or ("already exists" in line.lower()):
+                item.files_completed += 1
+                self.item_log.emit(item_id, f"  [{item.files_completed}] (skipped - already exists)")
 
         # Detect errors
         if "[error]" in line.lower():
@@ -747,12 +772,7 @@ class DownloadQueueManager(QObject):
             item = self.items[item_id]
             if item.status == DownloadStatus.DOWNLOADING:
                 item.pause_flag = True
-                # Directly kill the process for immediate effect
-                if item.process:
-                    try:
-                        item.process.kill()
-                    except Exception:
-                        pass
+                _graceful_kill(item.process)
 
     def resume_download(self, item_id: str):
         """Resume a paused download"""
@@ -770,12 +790,7 @@ class DownloadQueueManager(QObject):
         if item_id in self.items:
             item = self.items[item_id]
             item.stop_flag = True
-            # Directly kill the process for immediate effect
-            if item.process:
-                try:
-                    item.process.kill()
-                except Exception:
-                    pass
+            _graceful_kill(item.process)
             item.status = DownloadStatus.CANCELLED
             self.item_status_changed.emit(item_id, item.status.value)
 

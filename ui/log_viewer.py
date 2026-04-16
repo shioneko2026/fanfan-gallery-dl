@@ -10,11 +10,15 @@ from PyQt6.QtGui import QTextCursor, QFont
 
 
 class LogTextPanel(QTextEdit):
-    """Styled read-only log text panel"""
+    """Styled read-only log text panel with automatic size limiting"""
+
+    MAX_LINES = 5000
+    TRIM_LINES = 1000  # Remove this many when max is exceeded
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
+        self._line_count = 0
         self.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
@@ -51,6 +55,16 @@ class LogTextPanel(QTextEdit):
 
         cursor.insertText(line + "\n")
         self.setTextCursor(cursor)
+        self._line_count += 1
+
+        # Trim oldest lines when buffer exceeds max to prevent memory bloat
+        if self._line_count > self.MAX_LINES:
+            trim_cursor = QTextCursor(self.document())
+            trim_cursor.movePosition(QTextCursor.MoveOperation.Start)
+            for _ in range(self.TRIM_LINES):
+                trim_cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.KeepAnchor)
+            trim_cursor.removeSelectedText()
+            self._line_count -= self.TRIM_LINES
 
         # Auto-scroll
         scrollbar = self.verticalScrollBar()

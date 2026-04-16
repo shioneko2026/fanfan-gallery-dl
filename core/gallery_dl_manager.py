@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Optional, Dict, List, Callable
 import requests
+from core.logger import logger
 
 
 class GalleryDLManager:
@@ -159,7 +160,7 @@ class GalleryDLManager:
             return None
 
         except Exception as e:
-            print(f"Error getting version: {e}")
+            logger.error(f"Error getting gallery-dl version: {e}")
             return None
 
     def check_for_updates(self) -> Optional[Dict[str, str]]:
@@ -191,7 +192,7 @@ class GalleryDLManager:
             }
 
         except Exception as e:
-            print(f"Error checking for updates: {e}")
+            logger.error(f"Error checking for gallery-dl updates: {e}")
             return None
 
     def _compare_versions(self, v1: str, v2: str) -> int:
@@ -212,7 +213,7 @@ class GalleryDLManager:
                     return 1
 
             return 0
-        except:
+        except (ValueError, TypeError, AttributeError):
             return 0
 
     def update_binary(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:

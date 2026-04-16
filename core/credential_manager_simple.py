@@ -7,6 +7,7 @@ import json
 from typing import Optional, Dict
 from datetime import datetime
 from pathlib import Path
+from core.logger import logger
 
 
 class CredentialManager:
@@ -41,7 +42,7 @@ class CredentialManager:
             keyring.get_keyring()
             return True
         except Exception as e:
-            print(f"Keyring not available: {e}")
+            logger.warning(f"Keyring not available: {e}")
             return False
 
     def store_cookies(self, platform: str, cookie_string: str) -> bool:
@@ -82,7 +83,7 @@ class CredentialManager:
             return True
 
         except Exception as e:
-            print(f"Error storing cookies: {e}")
+            logger.error(f"Error storing cookies: {e}")
             return False
 
     def get_cookies(self, platform: str) -> Optional[str]:
@@ -103,7 +104,7 @@ class CredentialManager:
             return None
 
         except Exception as e:
-            print(f"Error retrieving cookies: {e}")
+            logger.error(f"Error retrieving cookies: {e}")
             return None
 
     def get_credentials(self, platform: str) -> Optional[Dict]:
@@ -156,7 +157,7 @@ class CredentialManager:
             return True
 
         except Exception as e:
-            print(f"Error writing cookie file: {e}")
+            logger.error(f"Error writing cookie file: {e}")
             return False
 
     def delete_cookies(self, platform: str) -> bool:
@@ -168,7 +169,7 @@ class CredentialManager:
             keyring.delete_password(self.SERVICE_NAME, f"{platform}_credentials")
             return True
         except Exception as e:
-            print(f"Error deleting cookies: {e}")
+            logger.error(f"Error deleting cookies: {e}")
             return False
 
     def has_cookies(self, platform: str) -> bool:
@@ -206,7 +207,7 @@ class CredentialManager:
             return True
 
         except Exception as e:
-            print(f"Error storing browser cookies: {e}")
+            logger.error(f"Error storing browser cookies: {e}")
             return False
 
     def store_cookie_file(self, platform: str, file_path: Path) -> tuple:
@@ -310,7 +311,7 @@ class CredentialManager:
             return True
 
         except Exception as e:
-            print(f"Error storing credentials: {e}")
+            logger.error(f"Error storing credentials: {e}")
             return False
 
     def get_auth_method(self, platform: str) -> Optional[str]:

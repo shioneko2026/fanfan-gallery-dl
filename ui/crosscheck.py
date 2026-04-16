@@ -257,19 +257,16 @@ class CrossCheckPage(QWidget):
         self.creator_combo.addItem("— Select a creator —", None)
 
         try:
-            creators = list(self.db.get_all_creators())
-            for a in creators:
-                a_dict = dict(a)
-                platforms = self.db.get_creator_platforms(a_dict['id'])
-                for p in platforms:
-                    p_dict = dict(p)
-                    label = f"{a_dict['display_name']} ({p_dict['platform'].title()})"
+            creators = self.db.get_all_creators_with_platforms()
+            for creator in creators:
+                for p in creator['platform_entries']:
+                    label = f"{creator['display_name']} ({p['platform'].title()})"
                     self.creator_combo.addItem(label, {
-                        'creator_id': a_dict['id'],
-                        'display_name': a_dict['display_name'],
-                        'profile_url': p_dict.get('profile_url', ''),
-                        'local_folder': p_dict.get('local_folder', ''),
-                        'platform': p_dict.get('platform', ''),
+                        'creator_id': creator['id'],
+                        'display_name': creator['display_name'],
+                        'profile_url': p.get('profile_url', ''),
+                        'local_folder': p.get('local_folder', ''),
+                        'platform': p.get('platform', ''),
                     })
         except Exception:
             pass
@@ -629,6 +626,7 @@ class CrossCheckPage(QWidget):
 
     def _populate_results_tree(self, missing, present, locked):
         """Populate the results tree with color-coded rows"""
+        self.results_tree.setUpdatesEnabled(False)
         self.results_tree.clear()
 
         colors = {
@@ -636,6 +634,8 @@ class CrossCheckPage(QWidget):
             'present': QColor("#2e7d32"),
             'locked': QColor("#757575"),
         }
+
+        batch_items = []
 
         def add_rows(items, status_text, color):
             for post in items:
@@ -655,11 +655,14 @@ class CrossCheckPage(QWidget):
                 elif status_text == "LOCKED":
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
 
-                self.results_tree.addTopLevelItem(item)
+                batch_items.append(item)
 
         add_rows(missing, "MISSING", colors['missing'])
         add_rows(present, "PRESENT", colors['present'])
         add_rows(locked, "LOCKED", colors['locked'])
+
+        self.results_tree.addTopLevelItems(batch_items)
+        self.results_tree.setUpdatesEnabled(True)
 
     # --- Actions ---
 

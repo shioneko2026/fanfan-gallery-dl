@@ -208,16 +208,12 @@ class PlatformCredentialCard(QGroupBox):
                 return
 
             db = parent.db
-            creators = list(db.get_all_creators())
-            for a in creators:
-                a_dict = dict(a)
-                platforms = db.get_creator_platforms(a_dict['id'])
-                for p in platforms:
-                    p_dict = dict(p)
-                    # Only show creators matching this platform
-                    if p_dict.get('platform', '').lower() == self.platform_id.lower():
-                        label = a_dict['display_name']
-                        url = p_dict.get('profile_url', '')
+            creators = db.get_all_creators_with_platforms()
+            for creator in creators:
+                for p in creator['platform_entries']:
+                    if p.get('platform', '').lower() == self.platform_id.lower():
+                        label = creator['display_name']
+                        url = p.get('profile_url', '')
                         if url:
                             self.test_creator_combo.addItem(label, url)
         except Exception:

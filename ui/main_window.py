@@ -324,12 +324,10 @@ class MainWindow(QMainWindow):
     def add_pages(self):
         """Add all pages to the content stack"""
         # Create shared download queue manager
-        from core.gallery_dl_manager import GalleryDLManager
         from core.download_queue import DownloadQueueManager
 
-        gallery_dl_manager = GalleryDLManager()
         max_concurrent = int(self.db.get_setting("concurrent_downloads", "2"))
-        self.queue_manager = DownloadQueueManager(gallery_dl_manager, self.db, max_concurrent=max_concurrent)
+        self.queue_manager = DownloadQueueManager(self.db, max_concurrent=max_concurrent)
 
         # Connect queue signals to log panels
         self.queue_manager.item_output.connect(self.on_queue_raw_output)
@@ -343,31 +341,34 @@ class MainWindow(QMainWindow):
         self.crosscheck_page = CrossCheckPage(self.db, self.queue_manager)
         self.artists_page = ArtistsPage(self.db)
 
-        # Settings pages
-        self.general_page = GeneralPage(self.db)
-        self.downloader_settings_page = DownloaderSettingsPage(self.db)
-        self.naming_page = NamingPage(self.db)
-        self.credentials_page = CredentialsPage(self.db)
-        self.updates_page = UpdatesPage(self.db)
-        self.data_page = DataPage(self.db)
+        # Settings pages — lazy-loaded on first navigation (faster startup)
+        # Factories create pages on demand; placeholders hold their stack position
+        self._lazy_factories = {
+            5: lambda: GeneralPage(self.db),
+            6: lambda: DownloaderSettingsPage(self.db),
+            7: lambda: NamingPage(self.db),
+            8: lambda: CredentialsPage(self.db),
+            9: lambda: UpdatesPage(self.db),
+            10: lambda: DataPage(self.db),
+        }
+        self._lazy_pages = {}  # index -> instantiated page (cache)
 
         # Add to stack (order must match button order)
+        # Main pages are real widgets; settings pages start as empty placeholders
         pages = [
             self.dashboard_page,            # 0
             self.downloader_page,           # 1
             self.queue_page,                # 2
             self.crosscheck_page,           # 3
             self.artists_page,              # 4
-            self.general_page,              # 5
-            self.downloader_settings_page,  # 6
-            self.naming_page,               # 7
-            self.credentials_page,          # 8
-            self.updates_page,              # 9
-            self.data_page                  # 10
         ]
-
         for page in pages:
             self.content_stack.addWidget(page)
+
+        # Add placeholder widgets for lazy settings pages (indices 5-10)
+        from PyQt6.QtWidgets import QWidget as _QW
+        for _ in range(len(self._lazy_factories)):
+            self.content_stack.addWidget(_QW())
 
     def on_nav_clicked(self):
         """Handle navigation button clicks"""
@@ -376,7 +377,25 @@ class MainWindow(QMainWindow):
         self.show_page(index)
 
     def show_page(self, index):
-        """Show a specific page and update button states"""
+        """Show a specific page and update button states.
+        Settings pages (indices 5-10) are lazy-loaded on first navigation.
+        """
+        # Lazy-load settings pages on first visit
+        if index in self._lazy_factories and index not in self._lazy_pages:
+            page = self._lazy_factories[index]()
+            self._lazy_pages[index] = page
+            # Replace the placeholder widget at this index
+            old = self.content_stack.widget(index)
+            self.content_stack.insertWidget(index, page)
+            self.content_stack.removeWidget(old)
+            old.deleteLater()
+            # Store named references for compatibility
+            ref_names = {5: 'general_page', 6: 'downloader_settings_page',
+                        7: 'naming_page', 8: 'credentials_page',
+                        9: 'updates_page', 10: 'data_page'}
+            if index in ref_names:
+                setattr(self, ref_names[index], page)
+
         self.content_stack.setCurrentIndex(index)
 
         # Update button checked states

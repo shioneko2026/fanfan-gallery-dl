@@ -13,6 +13,7 @@ import requests
 
 from version import APP_VERSION, GITHUB_REPO
 from core.paths import get_data_dir
+from core.logger import logger
 
 
 class AppUpdater:
@@ -65,7 +66,7 @@ class AppUpdater:
             }
 
         except Exception as e:
-            print(f"[AppUpdater] check_for_updates failed: {e}")
+            logger.warning(f"App update check failed: {e}")
             return None
 
     def download_update(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:

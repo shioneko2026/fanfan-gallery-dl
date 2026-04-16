@@ -12,6 +12,39 @@ from core.credential_manager_simple import CredentialManager
 class GalleryDLRunner:
     """Builds and executes gallery-dl commands"""
 
+    # gallery-dl exit code bitmask (codes are OR'd together)
+    EXIT_SUCCESS = 0
+    EXIT_DOWNLOAD_ERROR = 4       # Download/extraction failure
+    EXIT_CHALLENGE_ERROR = 8      # CAPTCHA or challenge
+    EXIT_AUTH_ERROR = 16           # Authentication/authorization failure
+    EXIT_FORMAT_ERROR = 32         # Input/format error
+    EXIT_UNSUPPORTED = 64          # Unsupported URL
+    EXIT_OS_ERROR = 128            # OS/filesystem error
+
+    @staticmethod
+    def parse_exit_code(exit_code):
+        """Parse gallery-dl bitmask exit code into human-readable messages.
+
+        Returns list of (level, message) tuples where level is 'warning' or 'error'.
+        """
+        if exit_code is None or exit_code == 0:
+            return []
+
+        messages = []
+        if exit_code & 16:
+            messages.append(("error", "Authentication failed — cookies may be expired or invalid"))
+        if exit_code & 4:
+            messages.append(("warning", "Some files failed to download"))
+        if exit_code & 8:
+            messages.append(("error", "CAPTCHA or challenge encountered — manual browser login may be needed"))
+        if exit_code & 32:
+            messages.append(("error", "Input/format error — check URL or filter syntax"))
+        if exit_code & 64:
+            messages.append(("error", "URL not supported by gallery-dl"))
+        if exit_code & 128:
+            messages.append(("error", "Filesystem error — check disk space and permissions"))
+        return messages
+
     def __init__(self, gallery_dl_path: Optional[Path] = None):
         """
         Initialize runner
@@ -43,7 +76,8 @@ class GalleryDLRunner:
         post_id_field: str = "id",
         rate_limit: str = "",
         sleep_request: str = "",
-        download_retries: int = 4
+        download_retries: int = 4,
+        skip_abort_threshold: int = 0
     ) -> tuple[List[str], Optional[Path]]:
         """
         Build gallery-dl command
@@ -61,6 +95,9 @@ class GalleryDLRunner:
             Tuple of (command list, cookie_file_path)
         """
         cmd = [str(self.gallery_dl_path)]
+
+        # Ignore user's global gallery-dl config — FanFan controls all settings
+        cmd.append("--config-ignore")
 
         # Handle authentication based on stored method
         cookie_file = None
@@ -100,16 +137,13 @@ class GalleryDLRunner:
         if output_dir:
             cmd.extend(["--destination", str(output_dir)])
 
-        # Date filters — gallery-dl uses Python expressions in --filter
+        # Date filters — use gallery-dl native date-after/date-before options
+        # More efficient than --filter expressions (can skip API calls on some platforms)
         filter_conditions = []
-        if date_from or date_to:
-            if date_from:
-                # gallery-dl date filter: date >= datetime(Y,M,D)
-                parts = ','.join(str(int(x)) for x in date_from.split('-'))
-                filter_conditions.append(f"date >= datetime({parts})")
-            if date_to:
-                parts = ','.join(str(int(x)) for x in date_to.split('-'))
-                filter_conditions.append(f"date <= datetime({parts},23,59,59)")
+        if date_from:
+            cmd.extend(["-o", f"date-after={date_from}"])
+        if date_to:
+            cmd.extend(["-o", f"date-before={date_to}"])
 
         # Post ID filter for selective downloading (uses creator URL + filter
         # instead of individual post URLs, which cause 403 on some platforms)
@@ -216,6 +250,12 @@ class GalleryDLRunner:
         if verbose:
             cmd.append("-v")
         
+        # Structured progress output via --print (parsed by _parse_progress)
+        # These emit prefixed lines for unambiguous file tracking
+        if not simulate and not dump_json:
+            cmd.extend(["--print", "download:[DOWNLOADED]{_path}"])
+            cmd.extend(["--print", "skip:[SKIPPED]{_path}"])
+
         # Rate limiting and sleep settings
         if rate_limit:
             cmd.extend(["--rate", rate_limit])
@@ -227,6 +267,14 @@ class GalleryDLRunner:
                 pass
         if download_retries != 4:
             cmd.extend(["--retries", str(download_retries)])
+        # Exponential backoff between retries (2s, 4s, 8s, 16s...)
+        if download_retries > 0:
+            cmd.extend(["-o", "sleep-retries=exp:2.0"])
+
+        # Skip:abort — stop early when N consecutive files already exist
+        # Useful for incremental updates on creators with large backlogs
+        if skip_abort_threshold > 0 and not post_ids and not simulate and not dump_json:
+            cmd.extend(["-o", f"skip=abort:{skip_abort_threshold}"])
 
         # URL
         cmd.append(url)
@@ -298,7 +346,8 @@ class GalleryDLRunner:
         process_callback: Optional[Callable] = None,
         rate_limit: str = "",
         sleep_request: str = "",
-        download_retries: int = 4
+        download_retries: int = 4,
+        skip_abort_threshold: int = 0
     ) -> Dict[str, any]:
         """
         Run gallery-dl command
@@ -312,6 +361,7 @@ class GalleryDLRunner:
             simulate: Just simulate
             verbose: Verbose output
             progress_callback: Callback for progress updates (receives stdout lines)
+            skip_abort_threshold: Stop after N consecutive skips (0=disabled)
 
         Returns:
             Dict with 'success', 'exit_code', 'stdout', 'stderr'
@@ -332,7 +382,8 @@ class GalleryDLRunner:
             post_id_field=post_id_field,
             rate_limit=rate_limit,
             sleep_request=sleep_request,
-            download_retries=download_retries
+            download_retries=download_retries,
+            skip_abort_threshold=skip_abort_threshold
         )
 
         try:
@@ -400,9 +451,13 @@ class GalleryDLRunner:
 
             exit_code = process.poll()
 
+            # Parse exit code bitmask for actionable error messages
+            exit_messages = self.parse_exit_code(exit_code)
+
             return {
                 "success": exit_code == 0,
                 "exit_code": exit_code,
+                "exit_messages": exit_messages,
                 "stdout": stdout_lines,
                 "stderr": []
             }
@@ -420,7 +475,7 @@ class GalleryDLRunner:
             if cookie_file and cookie_file.exists():
                 try:
                     cookie_file.unlink()
-                except:
+                except OSError:
                     pass
 
     def test_connection(self, platform: str, test_url: Optional[str] = None, log_callback: Optional[Callable[[str], None]] = None) -> Dict[str, any]:
@@ -503,7 +558,7 @@ class GalleryDLRunner:
             if cookie_file and cookie_file.exists():
                 try:
                     cookie_file.unlink()
-                except:
+                except OSError:
                     pass
 
             if log_callback:
@@ -530,7 +585,7 @@ class GalleryDLRunner:
             if cookie_file and cookie_file.exists():
                 try:
                     cookie_file.unlink()
-                except:
+                except OSError:
                     pass
             
             if log_callback:
