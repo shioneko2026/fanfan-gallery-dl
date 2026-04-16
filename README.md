@@ -107,8 +107,10 @@ The app needs your browser cookies to access your subscriptions. Cookies are sma
 
 5. **Copy the value** — click the cookie name to expand it, then copy the **Value** field (the long string of letters and numbers)
 
-   ![Cookie-Editor showing FANBOXSESSID](Screenshots/cookie-editor.jpg)
-   *Cookie-Editor showing the FANBOXSESSID cookie. Screenshot via [Cookie-Editor](https://cookie-editor.com/) by cgagnier.*
+   <p align="center">
+   <img src="Screenshots/cookie-editor.jpg" alt="Cookie-Editor showing FANBOXSESSID" width="400"><br>
+   <em>Cookie-Editor showing the FANBOXSESSID cookie. Screenshot via <a href="https://cookie-editor.com/">Cookie-Editor</a> by cgagnier.</em>
+   </p>
 
 6. **Paste into FanFan** — open the app, go to **Settings → Credentials**, select the platform tab, paste the value into the cookie field, and click **Save Cookies**
 
