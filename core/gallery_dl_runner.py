@@ -475,7 +475,7 @@ class GalleryDLRunner:
                 except OSError:
                     pass
 
-    def test_connection(self, platform: str, test_url: Optional[str] = None, log_callback: Optional[Callable[[str], None]] = None) -> Dict[str, any]:
+    def test_connection(self, platform: str, test_url: Optional[str] = None, log_callback: Optional[Callable[[str], None]] = None, raw_log_callback: Optional[Callable[[str], None]] = None) -> Dict[str, any]:
         """
         Test if credentials work by running gallery-dl
 
@@ -542,10 +542,13 @@ class GalleryDLRunner:
                 if line:
                     line = line.strip()
                     output_lines.append(line)
-                    # Only show gallery-dl log lines in the App Log,
-                    # not the raw JSON from --dump-json
-                    if log_callback and line.startswith("["):
-                        log_callback(line)
+                    if log_callback:
+                        # Gallery-dl log lines → App Log (warnings, errors, info)
+                        # JSON dump lines → Raw Output (for troubleshooting)
+                        if line.startswith("["):
+                            log_callback(line)
+                        elif raw_log_callback:
+                            raw_log_callback(line)
 
                 # Check if process finished
                 if process.poll() is not None:

@@ -510,6 +510,9 @@ The key cookie gallery-dl needs is **`{p['key_cookie']}`** — Cookie-Editor wil
             self.test_btn.setText("Test Connection")
 
         self.test_thread.output_line.connect(on_output)
+        # Send raw/JSON output to Raw Output tab for troubleshooting
+        if main_window and hasattr(main_window, 'log_panel'):
+            self.test_thread.raw_output_line.connect(main_window.log_panel.append_raw)
         self.test_thread.finished.connect(on_finished)
         self.test_thread.error.connect(on_error)
         self.test_thread.start()

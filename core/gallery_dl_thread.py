@@ -12,9 +12,10 @@ class GalleryDLThread(QThread):
     """Background thread for running gallery-dl without blocking UI"""
     
     # Signals
-    output_line = pyqtSignal(str)  # Emits each line of output
-    finished = pyqtSignal(dict)    # Emits result when done
-    error = pyqtSignal(str)        # Emits error message
+    output_line = pyqtSignal(str)      # Emits each line of output (App Log)
+    raw_output_line = pyqtSignal(str)  # Emits raw/debug output (Raw Output tab)
+    finished = pyqtSignal(dict)        # Emits result when done
+    error = pyqtSignal(str)            # Emits error message
     
     def __init__(
         self,
@@ -53,12 +54,17 @@ class GalleryDLThread(QThread):
             def process_callback(process):
                 self._process = process
 
+            # Callback for raw output lines (JSON, debug data → Raw Output tab)
+            def raw_output_callback(line: str):
+                self.raw_output_line.emit(line)
+
             if self.test_mode:
                 # Test connection mode (no timeout - runs until complete)
                 result = self.runner.test_connection(
                     platform=self.platform,
                     test_url=self.url,
-                    log_callback=output_callback
+                    log_callback=output_callback,
+                    raw_log_callback=raw_output_callback
                 )
             else:
                 # Regular run mode
