@@ -57,7 +57,8 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("FanFan Gallery-DL")
+        from version import APP_VERSION
+        self.setWindowTitle(f"FanFan Gallery-DL v{APP_VERSION}")
         self.setMinimumSize(1200, 800)
 
         # Central widget
