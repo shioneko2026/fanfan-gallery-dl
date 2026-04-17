@@ -120,17 +120,22 @@ class Database:
                 )
             """)
 
-            # Indexes for common query patterns
+            self.conn.commit()
+        self._migrate_artist_to_creator()
+        self._create_indexes()
+        self._initialize_default_settings()
+        self._initialize_default_presets()
+
+    def _create_indexes(self):
+        """Create indexes for common query patterns. Runs after migrations."""
+        with self._lock:
+            cursor = self.conn.cursor()
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_creator_id ON creator_platforms(creator_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_cp_profile_url ON creator_platforms(profile_url)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_dh_cp_id ON download_history(creator_platform_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_dh_session_date ON download_history(session_date DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_fd_cp_id ON failed_downloads(creator_platform_id)")
-
             self.conn.commit()
-        self._migrate_artist_to_creator()
-        self._initialize_default_settings()
-        self._initialize_default_presets()
 
     def _migrate_artist_to_creator(self):
         """Migrate old 'artists'/'artist_platforms' tables to 'creators'/'creator_platforms' naming"""
