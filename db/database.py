@@ -140,20 +140,35 @@ class Database:
     def _migrate_artist_to_creator(self):
         """Migrate old 'artists'/'artist_platforms' tables to 'creators'/'creator_platforms' naming"""
         with self._lock:
+            cursor = self.conn.cursor()
+
+            # Step 1: Rename tables if old names still exist
             try:
-                cursor = self.conn.cursor()
                 old_table = cursor.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='artists'"
                 ).fetchone()
                 if old_table:
                     cursor.execute("ALTER TABLE artists RENAME TO creators")
                     cursor.execute("ALTER TABLE artist_platforms RENAME TO creator_platforms")
-                    cursor.execute("ALTER TABLE creator_platforms RENAME COLUMN artist_id TO creator_id")
-                    cursor.execute("ALTER TABLE download_history RENAME COLUMN artist_platform_id TO creator_platform_id")
-                    cursor.execute("ALTER TABLE failed_downloads RENAME COLUMN artist_platform_id TO creator_platform_id")
                     self.conn.commit()
             except Exception:
-                # Safe to ignore — migration already applied or not needed
+                pass
+
+            # Step 2: Rename columns — check each independently
+            # (tables may have been renamed in a previous run but columns weren't)
+            def _has_column(table, column):
+                cols = cursor.execute(f"PRAGMA table_info({table})").fetchall()
+                return any(c[1] == column for c in cols)
+
+            try:
+                if _has_column("creator_platforms", "artist_id"):
+                    cursor.execute("ALTER TABLE creator_platforms RENAME COLUMN artist_id TO creator_id")
+                if _has_column("download_history", "artist_platform_id"):
+                    cursor.execute("ALTER TABLE download_history RENAME COLUMN artist_platform_id TO creator_platform_id")
+                if _has_column("failed_downloads", "artist_platform_id"):
+                    cursor.execute("ALTER TABLE failed_downloads RENAME COLUMN artist_platform_id TO creator_platform_id")
+                self.conn.commit()
+            except Exception:
                 pass
 
     def _initialize_default_settings(self):
