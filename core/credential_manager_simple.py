@@ -152,7 +152,8 @@ class CredentialManager:
                     if "=" in cookie:
                         name, value = cookie.split("=", 1)
                         # Simple format - gallery-dl will handle the details
-                        f.write(f".example.com\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
+                        # Expiration 2000000000 = year 2033; '0' means session cookie (discarded)
+                        f.write(f".example.com\tTRUE\t/\tFALSE\t2000000000\t{name}\t{value}\n")
 
             return True
 

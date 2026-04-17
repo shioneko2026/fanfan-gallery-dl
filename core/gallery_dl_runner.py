@@ -120,12 +120,16 @@ class GalleryDLRunner:
                 cookie_file.write("# Netscape HTTP Cookie File\n")
 
                 # Write cookies
+                # Far-future expiration (year 2033) — expiration 0 is treated
+                # as "session cookie, discard immediately" by Python's cookie
+                # parsers, causing the cookie to never actually be sent
+                expiry = "2000000000"
                 for cookie in cookie_string.split("; "):
                     if "=" in cookie:
                         name, value = cookie.split("=", 1)
                         # Use platform-specific domain
                         domain = self._get_domain(platform)
-                        cookie_file.write(f"{domain}\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
+                        cookie_file.write(f"{domain}\tTRUE\t/\tFALSE\t{expiry}\t{name}\t{value}\n")
 
                 cookie_file.close()
                 cmd.extend(["--cookies", cookie_file.name])
