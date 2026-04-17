@@ -1,5 +1,24 @@
 # FanFan Gallery-DL
 
+> ## ⚠️ Known Issue (April 2026) — Fanbox + Cloudflare
+>
+> Pixiv Fanbox recently strengthened its Cloudflare anti-bot protection. **Authenticated requests** from gallery-dl (which FanFan uses) are being blocked with 403 errors — regardless of how fresh your cookies are. This affects many users, especially in Southeast Asia.
+>
+> **Symptoms:**
+> - Test Connection fails with 403
+> - Scans show posts but "0 files" for everything (even free posts)
+> - Paid content cannot be downloaded
+>
+> **What's happening:** Cloudflare is using TLS and HTTP fingerprinting to detect non-browser clients. Gallery-dl uses Python's `requests` library which sends a distinctive non-Chrome signature. There's no cookie/config workaround — it's infrastructure-level.
+>
+> **We're actively working on solutions** — see [gallery-dl issue #9393](https://github.com/mikf/gallery-dl/issues/9393). Candidates include a patched gallery-dl using `curl-cffi` (Chrome TLS impersonation), or routing through a browser extension.
+>
+> **What still works:** Fantia, and Fanbox creators/accounts not yet affected by the stricter rules. You may find some of your Fanbox subscriptions still download fine.
+>
+> **Anonymous scan** of free posts still works if you clear cookies (Settings → Credentials → Clear Cookies). You'll see files listed but need auth to actually download paid content.
+
+---
+
 **Stop losing content. Stop re-downloading everything. Stop guessing what you're missing.**
 
 FanFan Gallery-DL is a Windows desktop app for downloading media from Pixiv Fanbox and Fantia. Scan a creator, see every post they've ever made, pick exactly what you want, and download it — with a consistent naming system so you always know what you have.
