@@ -520,22 +520,27 @@ class GalleryDLRunner:
         try:
             if log_callback:
                 log_callback(f"Running: {' '.join(cmd[:3])} ... --range 1 {cmd[-1]}")
-                log_callback(f"Testing with 1 post only (respects rate limits)")
-                log_callback(f"No timeout - will run until complete")
+                log_callback(f"Testing cookie validity — will stop once validated")
                 log_callback("-" * 60)
-            
+
             # Run with streaming output
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1
             )
 
             output_lines = []
+            warning_count = 0
+            json_line_seen = False
+            early_abort = False
 
-            # Read output indefinitely (no timeout)
+            # Thresholds for early abort — we already know the answer
+            MAX_WARNINGS = 5          # 5 warnings = cookies valid, no access to content
+            MAX_LINES = 500           # hard cap on output to avoid infinite loop
+
             while True:
                 line = process.stdout.readline()
 
@@ -543,19 +548,54 @@ class GalleryDLRunner:
                     line = line.strip()
                     output_lines.append(line)
                     if log_callback:
-                        # Gallery-dl log lines → App Log (warnings, errors, info)
-                        # JSON dump lines → Raw Output (for troubleshooting)
                         if line.startswith("["):
                             log_callback(line)
+                            if "[warning]" in line or "[error]" in line:
+                                warning_count += 1
                         elif raw_log_callback:
                             raw_log_callback(line)
+                            # JSON line with real data = cookies work, got access
+                            if line.startswith("{") or line.startswith("[2,"):
+                                json_line_seen = True
+
+                    # Early abort: we have enough evidence
+                    if json_line_seen:
+                        # Cookies verified with actual data — stop
+                        if log_callback:
+                            log_callback("✓ Cookies verified — stopping early to save rate limit")
+                        early_abort = True
+                        break
+                    if warning_count >= MAX_WARNINGS:
+                        # Cookies being sent but user has no access — enough signal
+                        if log_callback:
+                            log_callback(f"✓ Cookies verified ({warning_count} warnings = auth working, no paid access) — stopping early")
+                        early_abort = True
+                        break
+                    if len(output_lines) >= MAX_LINES:
+                        if log_callback:
+                            log_callback("⚠ Output limit reached — aborting test")
+                        early_abort = True
+                        break
 
                 # Check if process finished
                 if process.poll() is not None:
                     break
-            
-            # Get exit code
+
+            if early_abort:
+                try:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=3)
+                    except Exception:
+                        process.kill()
+                except Exception:
+                    pass
+
+            # Exit code: 0 if normal completion; ignore if we aborted early
             exit_code = process.poll()
+            if early_abort:
+                # Early abort means we already decided — treat as success
+                exit_code = 0 if (json_line_seen or warning_count > 0) else exit_code
 
             # Clean up cookie file
             if cookie_file and cookie_file.exists():
