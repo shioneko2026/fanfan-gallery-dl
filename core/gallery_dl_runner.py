@@ -124,9 +124,14 @@ class GalleryDLRunner:
                 # as "session cookie, discard immediately" by Python's cookie
                 # parsers, causing the cookie to never actually be sent
                 expiry = "2000000000"
-                for cookie in cookie_string.split("; "):
+                # Split on semicolons (handle both "; " and ";" — Cookie-Editor
+                # "Header string" format uses ";" without space)
+                import re as _re
+                for cookie in _re.split(r';\s*', cookie_string):
+                    cookie = cookie.strip()
                     if "=" in cookie:
                         name, value = cookie.split("=", 1)
+                        name = name.strip()
                         # Use platform-specific domain
                         domain = self._get_domain(platform)
                         cookie_file.write(f"{domain}\tTRUE\t/\tFALSE\t{expiry}\t{name}\t{value}\n")
