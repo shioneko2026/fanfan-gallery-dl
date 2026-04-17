@@ -96,9 +96,6 @@ class GalleryDLRunner:
         """
         cmd = [str(self.gallery_dl_path)]
 
-        # Ignore user's global gallery-dl config — FanFan controls all settings
-        cmd.append("--config-ignore")
-
         # Handle authentication based on stored method
         cookie_file = None
         auth_method = self.cred_manager.get_auth_method(platform)
@@ -506,14 +503,16 @@ class GalleryDLRunner:
         if not self.cred_manager.has_cookies(platform):
             return {"success": False, "message": "No cookies stored"}
 
-        # Build command - minimal test, respect rate limits
+        # Build command - use simulate + dump-json (same as scan, which works)
+        # simulate-only without dump-json triggers 403 on some platforms
         cmd, cookie_file = self.build_command(
             url=url,
             platform=platform,
             simulate=True,
-            verbose=False  # Less verbose for testing
+            dump_json=True,
+            verbose=False
         )
-        
+
         # Limit to just 1 post for testing (max ~5 files)
         cmd.insert(-1, "--range")
         cmd.insert(-1, "1")
@@ -535,18 +534,19 @@ class GalleryDLRunner:
             )
 
             output_lines = []
-            
+
             # Read output indefinitely (no timeout)
             while True:
-                # Read line
                 line = process.stdout.readline()
-                
+
                 if line:
                     line = line.strip()
                     output_lines.append(line)
-                    if log_callback:
+                    # Only show gallery-dl log lines in the App Log,
+                    # not the raw JSON from --dump-json
+                    if log_callback and line.startswith("["):
                         log_callback(line)
-                
+
                 # Check if process finished
                 if process.poll() is not None:
                     break
